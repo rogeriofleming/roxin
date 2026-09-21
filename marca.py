@@ -73,6 +73,79 @@ def pixmap(tam, cor=AMBAR, fundo=None):
     return pm
 
 
+def _caminhos_controle(nome):
+    """Icones dos controles desenhados em vetor, num canvas 24x24.
+    Glifo de fonte fica a merce da fonte instalada e serrilha; vetor nao."""
+    p = QPainterPath()
+    if nome == "play":
+        p.moveTo(8, 5); p.lineTo(19, 12); p.lineTo(8, 19); p.closeSubpath()
+    elif nome == "pause":
+        p.addRoundedRect(QRectF(7.5, 5, 3.4, 14), 1.4, 1.4)
+        p.addRoundedRect(QRectF(13.1, 5, 3.4, 14), 1.4, 1.4)
+    elif nome == "anterior":
+        p.addRoundedRect(QRectF(5, 5, 2.6, 14), 1.2, 1.2)
+        p.moveTo(19, 5); p.lineTo(19, 19); p.lineTo(8.6, 12); p.closeSubpath()
+    elif nome == "proxima":
+        p.moveTo(5, 5); p.lineTo(15.4, 12); p.lineTo(5, 19); p.closeSubpath()
+        p.addRoundedRect(QRectF(16.4, 5, 2.6, 14), 1.2, 1.2)
+    elif nome == "aleatorio":
+        for y1, y2 in ((7.5, 16.5), (16.5, 7.5)):          # duas setas que se cruzam
+            c = QPainterPath()
+            c.moveTo(3.5, y1)
+            c.cubicTo(8, y1, 10, y2, 14.5, y2)
+            p.addPath(_traco(c, 2.0))
+        p.addPath(_ponta(14.0, 7.5)); p.addPath(_ponta(14.0, 16.5))
+    elif nome == "repetir":
+        c = QPainterPath()
+        c.arcMoveTo(QRectF(4.5, 4.5, 15, 15), 65)
+        c.arcTo(QRectF(4.5, 4.5, 15, 15), 65, 300)
+        p.addPath(_traco(c, 2.0))
+        p.addPath(_ponta(17.4, 8.6, -35))
+    elif nome == "saida":                                   # alto-falante com onda
+        p.moveTo(4, 9.5); p.lineTo(8, 9.5); p.lineTo(12.5, 5); p.lineTo(12.5, 19)
+        p.lineTo(8, 14.5); p.lineTo(4, 14.5); p.closeSubpath()
+        for r in (3.4, 6.2):
+            a = QPainterPath()
+            a.arcMoveTo(QRectF(12.5 - r, 12 - r, r * 2, r * 2), -55)
+            a.arcTo(QRectF(12.5 - r, 12 - r, r * 2, r * 2), -55, 110)
+            p.addPath(_traco(a, 1.7))
+    return p
+
+
+def _traco(caminho, espessura):
+    """Transforma uma linha em area preenchivel (sem depender de caneta)."""
+    from PySide6.QtGui import QPainterPathStroker
+    s = QPainterPathStroker()
+    s.setWidth(espessura)
+    s.setCapStyle(Qt.RoundCap)
+    s.setJoinStyle(Qt.RoundJoin)
+    return s.createStroke(caminho)
+
+
+def _ponta(x, y, giro=0):
+    """Pontinha de seta triangular."""
+    t = QPainterPath()
+    t.moveTo(x, y - 3.1); t.lineTo(x + 4.4, y); t.lineTo(x, y + 3.1); t.closeSubpath()
+    if giro:
+        from PySide6.QtGui import QTransform
+        t = QTransform().translate(x, y).rotate(giro).translate(-x, -y).map(t)
+    return t
+
+
+def icone_controle(nome, cor=PENA, tam=22):
+    """QIcon vetorial de um controle do player."""
+    pm = QPixmap(tam, tam)
+    pm.fill(Qt.transparent)
+    pt = QPainter(pm)
+    pt.setRenderHint(QPainter.Antialiasing, True)
+    pt.scale(tam / 24.0, tam / 24.0)
+    pt.setPen(Qt.NoPen)
+    pt.setBrush(QBrush(QColor(cor)))
+    pt.drawPath(_caminhos_controle(nome))
+    pt.end()
+    return QIcon(pm)
+
+
 def pintar_barra_titulo(janela):
     """Windows 11: tira a cor de destaque do sistema da barra de titulo e poe a do app.
     Devolve True se o Windows aceitou. Em versao antiga falha em silencio, sem quebrar."""

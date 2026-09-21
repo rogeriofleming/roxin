@@ -5,12 +5,12 @@ Le D:\\Music e as playlists .m3u de D:\\Music\\Playlists."""
 import sys, os, io, re, random
 
 from PySide6.QtCore import Qt, QUrl, QSize
-from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QPainter, QColor
+from PySide6.QtGui import QKeySequence, QShortcut, QIcon, QPixmap, QPainter, QColor, QFont
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QSlider, QHeaderView, QAbstractItemView, QFrame, QSizePolicy)
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput, QMediaDevices
 
 MUSICA    = r"D:\Music"
 PLAYLISTS = r"D:\Music\Playlists"
@@ -87,18 +87,23 @@ def carregar():
         for f in sorted(os.listdir(PLAYLISTS)):
             if not f.lower().endswith((".m3u", ".m3u8")):
                 continue
-            itens, dur = [], None
+            itens, dur, titulo = [], None, None
             for ln in io.open(os.path.join(PLAYLISTS, f), encoding="utf-8", errors="replace"):
                 ln = ln.strip()
                 if ln.startswith("#EXTINF:"):
                     try:    dur = int(ln.split(":")[1].split(",")[0])
                     except Exception: dur = None
+                    # o nome escrito na playlist manda: e como o Roger chama a musica
+                    titulo = ln.split(",", 1)[1].strip() if "," in ln else None
                 elif ln and not ln.startswith("#"):
                     n = add(ln)
                     if n is not None:
                         itens.append(n)
                         if dur: faixas[n]["d"] = dur
-                    dur = None
+                        if titulo:
+                            faixas[n]["t"] = titulo
+                            faixas[n]["b"] = sem_acento(titulo)
+                    dur = titulo = None
             if itens:
                 listas.append((os.path.splitext(f)[0], itens))
 
@@ -120,7 +125,7 @@ import marca as M
 
 ESTILO = """
 QMainWindow, QWidget { background:%(noite)s; color:%(pena)s;
-    font-family:"Segoe UI"; font-size:14px; }
+    font-family:"Segoe UI","Yu Gothic UI","Meiryo","MS UI Gothic",sans-serif; font-size:14px; }
 
 #lado { background:%(painel)s; border-right:1px solid %(linha)s; }
 QListWidget::item { margin:1px 0; }
@@ -193,7 +198,10 @@ class Player(QMainWindow):
         self.resize(1080, 680)
         self.setMinimumSize(720, 460)
 
+        self._saida_escolhida = None          # None = seguir o padrao do Windows
         self.saida = QAudioOutput(); self.saida.setVolume(0.8)
+        self._devs = QMediaDevices(self)
+        self._devs.audioOutputsChanged.connect(self._saida_do_sistema_mudou)
         self.mp = QMediaPlayer(); self.mp.setAudioOutput(self.saida)
         self.mp.positionChanged.connect(self._andou)
         self.mp.durationChanged.connect(self._durou)
@@ -285,18 +293,26 @@ class Player(QMainWindow):
         def bt(txt, dica, w=34, obj=None):
             b = QPushButton(txt); b.setToolTip(dica); b.setFixedSize(w, w)
             b.setCursor(Qt.PointingHandCursor)
+            b.setIconSize(QSize(20, 20) if w < 40 else QSize(18, 18))
             if obj: b.setObjectName(obj)
             return b
 
-        self.b_ant   = bt("\u25c2\u25c2", "Anterior")
-        self.b_tocar = bt("\u25b6", "Tocar", 42, "tocar")
-        self.b_prox  = bt("\u25b8\u25b8", "Próxima")
-        self.b_ale   = bt("\u21c4", "Aleatório"); self.b_ale.setCheckable(True)
-        self.b_rep   = bt("\u21bb", "Repetir");   self.b_rep.setCheckable(True)
+        self.b_ant   = bt("", "Anterior");  self.b_ant.setIcon(M.icone_controle("anterior"))
+        self.b_tocar = bt("", "Tocar", 42, "tocar"); self.b_tocar.setIcon(M.icone_controle("play", M.NOITE, 20))
+        self.b_prox  = bt("", "Próxima"); self.b_prox.setIcon(M.icone_controle("proxima"))
+        self.b_ale   = bt("", "Aleatório"); self.b_ale.setCheckable(True)
+        self.b_ale.setIcon(M.icone_controle("aleatorio"))
+        self.b_rep   = bt("", "Repetir"); self.b_rep.setCheckable(True)
+        self.b_rep.setIcon(M.icone_controle("repetir"))
         self.b_ant.clicked.connect(self._anterior)
         self.b_tocar.clicked.connect(self._play_pause)
         self.b_prox.clicked.connect(lambda: self._pula(1))
         self.b_ale.toggled.connect(self._aleatorio)
+        # com icone (e nao texto), o :checked do estilo nao muda a cor — trocar o icone
+        self.b_ale.toggled.connect(lambda on: self.b_ale.setIcon(
+            M.icone_controle("aleatorio", M.AMBAR if on else M.PENA)))
+        self.b_rep.toggled.connect(lambda on: self.b_rep.setIcon(
+            M.icone_controle("repetir", M.AMBAR if on else M.PENA)))
         for b in (self.b_ant, self.b_tocar, self.b_prox): cr.addWidget(b)
 
         self.t_atual = QLabel("0:00"); self.t_atual.setObjectName("tempo")
@@ -307,10 +323,17 @@ class Player(QMainWindow):
         cr.addWidget(self.t_atual); cr.addWidget(self.barra, 4); cr.addWidget(self.t_total)
 
         cr.addWidget(self.b_ale); cr.addWidget(self.b_rep)
+
+        # escolher POR ONDE sai o som (TV, fone...). O Qt fixa o dispositivo ao abrir
+        # e nao acompanha a troca feita no Windows — por isso a escolha mora aqui.
+        self.b_saida = bt("", "Sair o som por…"); self.b_saida.setIcon(M.icone_controle("saida"))
+        self.b_saida.clicked.connect(self._menu_saida)
+        cr.addWidget(self.b_saida)
+
         self.vol = QSlider(Qt.Horizontal); self.vol.setRange(0, 100); self.vol.setValue(80)
         self.vol.setFixedWidth(90); self.vol.setToolTip("Volume")
         self.vol.valueChanged.connect(lambda v: self.saida.setVolume(v/100))
-        vlb = QLabel("VOL"); vlb.setObjectName("tempo"); cr.addWidget(vlb); cr.addWidget(self.vol)
+        cr.addWidget(self.vol)
         vert.addWidget(rod)
 
         QShortcut(QKeySequence(Qt.Key_Space), self, self._play_pause)
@@ -389,6 +412,48 @@ class Player(QMainWindow):
     def _aleatorio(self, on):
         if on and self.ordem: self._embaralha()
 
+    # -------------------------------------------------- saida de audio
+    def _menu_saida(self):
+        """Lista as saidas do sistema e troca sem parar a musica."""
+        from PySide6.QtWidgets import QMenu
+        atual = self.saida.device()
+        m = QMenu(self)
+        acao_padrao = m.addAction("Padrão do sistema")
+        acao_padrao.setCheckable(True)
+        acao_padrao.setChecked(self._saida_escolhida is None)
+        m.addSeparator()
+        acoes = {}
+        for d in QMediaDevices.audioOutputs():
+            a = m.addAction(d.description())
+            a.setCheckable(True)
+            a.setChecked(self._saida_escolhida is not None and d.id() == atual.id())
+            acoes[a] = d
+        esc = m.exec(self.b_saida.mapToGlobal(self.b_saida.rect().topLeft()))
+        if esc is None:
+            return
+        if esc is acao_padrao:
+            self._saida_escolhida = None
+            self._aplicar_saida(QMediaDevices.defaultAudioOutput())
+        elif esc in acoes:
+            self._saida_escolhida = acoes[esc]
+            self._aplicar_saida(acoes[esc])
+
+    def _aplicar_saida(self, disp):
+        """Troca o dispositivo preservando o ponto da musica."""
+        tocando = self.mp.playbackState() == QMediaPlayer.PlayingState
+        onde = self.mp.position()
+        self.saida.setDevice(disp)
+        if onde:
+            self.mp.setPosition(onde)
+        if tocando:
+            self.mp.play()
+        self.b_saida.setToolTip("Som saindo por: %s" % disp.description())
+
+    def _saida_do_sistema_mudou(self):
+        """Se o Roger nao fixou uma saida, seguir o padrao do Windows quando ele mudar."""
+        if self._saida_escolhida is None:
+            self._aplicar_saida(QMediaDevices.defaultAudioOutput())
+
     # -------------------------------------------------- sinais
     def _andou(self, p):
         if not self.barra.isSliderDown(): self.barra.setValue(p)
@@ -398,7 +463,8 @@ class Player(QMainWindow):
         self.barra.setRange(0, d); self.t_total.setText(mmss(d/1000))
 
     def _estado(self, e):
-        self.b_tocar.setText("\u275a\u275a" if e == QMediaPlayer.PlayingState else "\u25b6")
+        self.b_tocar.setIcon(M.icone_controle(
+            "pause" if e == QMediaPlayer.PlayingState else "play", M.NOITE, 20))
 
     def _status(self, s):
         if s == QMediaPlayer.EndOfMedia:
@@ -422,6 +488,10 @@ def identidade_no_windows():
 if __name__ == "__main__":
     identidade_no_windows()
     app = QApplication(sys.argv)
+    f = QFont("Segoe UI", 10)
+    f.setStyleStrategy(QFont.PreferAntialias)       # sem isto o japones serrilha
+    f.setHintingPreference(QFont.PreferFullHinting)
+    app.setFont(f)
     app.setStyleSheet(ESTILO)
     j = Player(); j.show()
     M.pintar_barra_titulo(j)      # barra de titulo na cor do app, nao no verde do Windows
