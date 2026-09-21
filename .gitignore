@@ -1,0 +1,18 @@
+# build do PyInstaller — gerado, nao versionado (134 MB)
+build/
+dist/
+*.manifest
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# windows
+desktop.ini
+Thumbs.db
+
+# arquivos de teste que eu gero ao conferir o visual
+_tela.png
+_teste_marca.png
