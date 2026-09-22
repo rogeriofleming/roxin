@@ -395,6 +395,11 @@ QHeaderView::section { background:%(noite)s; color:#7b7290; border:none;
 #limpaFila:hover { color:%(pena)s; background:#241d33; }
 #dicaFila { color:%(fraca)s; font-size:12px; padding:14px 18px; }
 
+#botaoBaixar { background:%(painel)s; border:1px solid %(linha)s; border-radius:8px;
+    color:%(fraca)s; font-size:13px; padding:0 16px; }
+#botaoBaixar:hover { color:%(pena)s; border:1px solid %(luar)s; }
+#botaoBaixar:checked { color:%(ambar)s; border:1px solid %(ambar)s; }
+
 #pescaria { background:%(painel)s; border:1px solid %(linha)s; border-radius:10px; }
 #pescaria QLabel { background:transparent; }
 #qualidade { background:%(noite)s; border:1px solid %(linha)s; border-radius:8px;
@@ -559,11 +564,9 @@ class Mini(QWidget):
         self.setObjectName("mini")
         self.setFixedSize(400, 74)
         self._arrasto = None
-        self._luz = None              # onde esta o mouse, para o brilho especular
         self._vidro = None            # qual caminho de acrilico pegou
         self._atras = None            # foto do que esta atras (para refratar)
         self._fase = 0.0              # fase da onda: e o que faz parecer liquido
-        self.setMouseTracking(True)
         self._onda = QTimer(self)
         self._onda.setInterval(33)    # ~30 quadros por segundo
         self._onda.timeout.connect(self._andar_onda)
@@ -631,14 +634,16 @@ class Mini(QWidget):
         alt = self.height()
         p.save()
         p.setClipPath(forma)
-        p.setOpacity(0.55)
+        p.setOpacity(0.78)
         faixa = 2
         meio = alt / 2.0
         for y in range(0, alt, faixa):
             # quanto mais longe do meio (vertical), mais a lente desloca
             distancia = abs(y - meio) / meio
-            amplitude = 2.0 + 5.0 * (distancia ** 1.6)
-            dx = amplitude * math.sin(y / 13.0 + self._fase)
+            amplitude = 4.0 + 9.0 * (distancia ** 1.4)
+            # duas frequencias somadas: uma so fica com cara de listra mecanica
+            dx = (amplitude * math.sin(y / 11.0 + self._fase)
+                  + amplitude * 0.45 * math.sin(y / 4.5 - self._fase * 1.7))
             p.drawPixmap(int(round(dx)), y, foto, 0, y, self.width(), faixa)
         p.restore()
         p.setOpacity(1.0)
@@ -669,20 +674,18 @@ class Mini(QWidget):
         # 1. base bem clara: o pedido foi "menos vidro escuro, mais transparencia".
         #    Ela serve so para o texto continuar legivel sobre fundo claro.
         base = QLinearGradient(0, 0, 0, r.height())
-        base.setColorAt(0.0, QColor(34, 28, 51, 66))
-        base.setColorAt(1.0, QColor(15, 12, 22, 96))
+        base.setColorAt(0.0, QColor(34, 28, 51, 106))
+        base.setColorAt(1.0, QColor(15, 12, 22, 140))
         p.fillPath(forma, QBrush(base))
 
         # 1b. a camada LIQUIDA: o fundo refratado, ondulando
         self._pintar_liquido(p, forma)
 
-        # 2. brilho especular: o clarao que segue o mouse (a camada 5 da skill)
-        if self._luz is not None:
-            g = QRadialGradient(float(self._luz.x()), float(self._luz.y()), 150.0)
-            g.setColorAt(0.0, QColor(255, 255, 255, 34))
-            g.setColorAt(0.55, QColor(255, 255, 255, 10))
-            g.setColorAt(1.0, QColor(255, 255, 255, 0))
-            p.save(); p.setClipPath(forma); p.fillPath(forma, QBrush(g)); p.restore()
+        # 1c. veu fino DEPOIS da onda: sem ele, fundo claro e ruidoso engole o
+        #     nome da musica. Mantem a onda visivel e devolve a legibilidade.
+        p.fillPath(forma, QColor(16, 13, 24, 58))
+
+        # (o brilho que seguia o mouse foi tirado por pedido dele)
 
         # 3. moldura de luz: fio claro no topo, sombra na base — da volume de lente
         p.save(); p.setClipPath(forma)
@@ -714,10 +717,6 @@ class Mini(QWidget):
         p.drawPath(forma)
         p.end()
 
-    def leaveEvent(self, ev):
-        self._luz = None
-        self.update()
-
     # -- arraste, porque nao ha barra de titulo
     def mousePressEvent(self, ev):
         if ev.button() == Qt.LeftButton:
@@ -727,8 +726,7 @@ class Mini(QWidget):
         if self._arrasto is not None and ev.buttons() & Qt.LeftButton:
             self.move(ev.globalPosition().toPoint() - self._arrasto)
             return
-        self._luz = ev.position().toPoint()      # alimenta o brilho especular
-        self.update()
+        return
 
     def mouseReleaseEvent(self, ev):
         if self._arrasto is not None:
@@ -761,6 +759,22 @@ class Mini(QWidget):
     def resizeEvent(self, ev):
         super().resizeEvent(ev)
         self._reelide()
+
+    # -- mesma API do mini de vidro, para o Player nao precisar saber qual esta em uso
+    def poe_faixa(self, nome, pixmap_capa):
+        self.capa.setPixmap(pixmap_capa)
+        self.poe_nome(nome)
+
+    def poe_progresso(self, pos, dur):
+        if not self.barra.isSliderDown():
+            self.barra.setRange(0, dur or 0)
+            self.barra.setValue(pos)
+
+    def poe_estado(self, tocando):
+        self.b_toc.setIcon(M.icone_controle("pause" if tocando else "play", M.NOITE, 16))
+
+    def mandar_tudo(self):
+        pass
 
     def no_cantinho(self):
         """Canto de baixo à direita da área util (acima da barra de tarefas)."""
@@ -800,9 +814,7 @@ class Player(QMainWindow):
         self._pinta_fila()
 
         self._ajustes = ler_ajustes()
-        self.mini = Mini(self)
-        lugar = self._ajustes.get("mini_lugar")
-        self.mini.move(QPoint(*lugar)) if lugar else self.mini.no_cantinho()
+        self.mini = None          # nasce na primeira vez que for preciso
         self.b_mini.setChecked(bool(self._ajustes.get("mini", False)))
 
         # capa que chegar DEPOIS (o buscador roda em segundo plano, fora do app)
@@ -862,7 +874,18 @@ class Player(QMainWindow):
         self.busca.setPlaceholderText("Pesquisar música…")
         self.busca.setFixedWidth(430)
         self.busca.textChanged.connect(self._filtra)
-        topo.addWidget(self.busca); topo.addStretch(1)
+        topo.addWidget(self.busca)
+
+        # o lugar dele e aqui, do lado da busca: baixar musica e achar musica sao
+        # a mesma familia de tarefa; no rodape (com os controles) nao era
+        self.b_baixar = QPushButton("Baixar"); self.b_baixar.setObjectName("botaoBaixar")
+        self.b_baixar.setCheckable(True); self.b_baixar.setCursor(Qt.PointingHandCursor)
+        self.b_baixar.setFixedHeight(36); self.b_baixar.setMinimumWidth(74)
+        self.b_baixar.setToolTip("Baixar música de um link")
+        self.b_baixar.toggled.connect(self._mostra_pescaria)
+        topo.addSpacing(10)
+        topo.addWidget(self.b_baixar)
+        topo.addStretch(1)
         cc.addLayout(topo)
 
         self._monta_pescaria(cc)
@@ -1002,13 +1025,6 @@ class Player(QMainWindow):
         self.b_fila.setToolTip("Mostrar o que está agendado")
         self.b_fila.toggled.connect(self._mostra_fila)
         cr.addWidget(self.b_fila)
-
-        self.b_baixar = QPushButton("Baixar"); self.b_baixar.setObjectName("botaoFila")
-        self.b_baixar.setCheckable(True); self.b_baixar.setCursor(Qt.PointingHandCursor)
-        self.b_baixar.setFixedHeight(28); self.b_baixar.setMinimumWidth(58)
-        self.b_baixar.setToolTip("Baixar música de um link (Anzol)")
-        self.b_baixar.toggled.connect(self._mostra_pescaria)
-        cr.addWidget(self.b_baixar)
 
         self.b_mini = QPushButton("Mini"); self.b_mini.setObjectName("botaoFila")
         self.b_mini.setCheckable(True); self.b_mini.setCursor(Qt.PointingHandCursor)
@@ -1381,12 +1397,30 @@ class Player(QMainWindow):
         self._capas_a_vista()
 
     # -------------------------------------------------- miniplayer
+    def _garante_mini(self):
+        """Cria a janelinha na primeira vez. Tenta o mini de VIDRO (a pagina com o
+        CSS aprovado); sem QtWebEngine na maquina, cai no pintado a mao."""
+        if self.mini is not None:
+            return self.mini
+        try:
+            from mini_vidro import MiniVidro
+            self.mini = MiniVidro(self)
+            self._tipo_mini = "vidro (HTML + filtro da skill)"
+        except Exception as e:
+            self.mini = Mini(self)
+            self._tipo_mini = "pintado a mao (sem QtWebEngine: %s)" % e
+        lugar = self._ajustes.get("mini_lugar")
+        self.mini.move(QPoint(*lugar)) if lugar else self.mini.no_cantinho()
+        return self.mini
+
     def _liga_mini(self, on):
         self._ajustes["mini"] = bool(on)
         gravar_ajustes(self._ajustes)
         self._decide_mini()
 
     def _guarda_lugar_do_mini(self):
+        if self.mini is None:
+            return
         pt = self.mini.pos()
         self._ajustes["mini_lugar"] = [pt.x(), pt.y()]
         gravar_ajustes(self._ajustes)
@@ -1394,29 +1428,28 @@ class Player(QMainWindow):
     def _decide_mini(self, aqui=None):
         """Mostra o mini quando o Roger esta FORA do Roxin. `aqui` existe para o
         teste poder dizer "a janela principal esta ativa" sem depender do foco real."""
-        if not hasattr(self, "mini"):
-            return
         aqui = self.isActiveWindow() if aqui is None else aqui
         fora = self.isMinimized() or not aqui
-        if self.b_mini.isChecked() and fora and self.tocando >= 0:
+        precisa = self.b_mini.isChecked() and fora and self.tocando >= 0
+        if precisa:
+            self._garante_mini()
             self._pinta_mini()
             if not self.mini.isVisible():
                 self.mini.fotografar_atras()      # com ela ainda escondida
                 self.mini.setWindowOpacity(0.0)
                 self.mini.show()
                 suave(self.mini, "windowOpacity", 0.0, 1.0, MOV_PADRAO)
-        elif self.mini.isVisible():
+        elif self.mini is not None and self.mini.isVisible():
             suave(self.mini, "windowOpacity", self.mini.windowOpacity(), 0.0,
                   180, QEasingCurve.InCubic, fim=self.mini.hide)
 
     def _pinta_mini(self):
-        if self.tocando < 0:
+        if self.tocando < 0 or self.mini is None:
             return
         f = self.faixas[self.tocando]
-        self.mini.capa.setPixmap(capa(os.path.basename(f["p"]), CAPA_MINI))
-        self.mini.poe_nome(f["t"])
-        self.mini.barra.setRange(0, self.mp.duration())
-        self.mini.barra.setValue(self.mp.position())
+        self.mini.poe_faixa(f["t"], capa(os.path.basename(f["p"]), CAPA_MINI * 2))
+        self.mini.poe_progresso(self.mp.position(), self.mp.duration())
+        self.mini.poe_estado(self.mp.playbackState() == QMediaPlayer.PlayingState)
 
     def changeEvent(self, ev):
         super().changeEvent(ev)
@@ -1424,7 +1457,7 @@ class Player(QMainWindow):
             self._decide_mini()
 
     def closeEvent(self, ev):
-        if hasattr(self, "mini"):
+        if self.mini is not None:
             self.mini.close()          # senao a janelinha sobrevive ao app
         super().closeEvent(ev)
 
@@ -1491,7 +1524,7 @@ class Player(QMainWindow):
         suave(ef, "opacity", 0.25, 1.0, MOV_PADRAO, QEasingCurve.OutCubic,
               fim=lambda: self.capa_atual.setGraphicsEffect(None))
         self.setWindowTitle("%s — Roxin" % f["t"])
-        if hasattr(self, "mini"):
+        if self.mini is not None:
             self._pinta_mini()
         if getattr(self, "_no_palco", False):
             self._pinta_palco()
@@ -1834,24 +1867,23 @@ class Player(QMainWindow):
     def _andou(self, p):
         if not self.barra.isSliderDown(): self.barra.setValue(p)
         self.t_atual.setText(mmss(p/1000))
-        if hasattr(self, "mini") and self.mini.isVisible() \
-           and not self.mini.barra.isSliderDown():
-            self.mini.barra.setValue(p)
+        if self.mini is not None and self.mini.isVisible():
+            self.mini.poe_progresso(p, self.mp.duration())
         if getattr(self, "_no_palco", False) and not self.barra_palco.isSliderDown():
             self.barra_palco.setValue(p)
             self.t_atual_p.setText(mmss(p / 1000))
 
     def _durou(self, d):
         self.barra.setRange(0, d); self.t_total.setText(mmss(d/1000))
-        if hasattr(self, "mini"): self.mini.barra.setRange(0, d)
+        if self.mini is not None: self.mini.poe_progresso(self.mp.position(), d)
         if hasattr(self, "barra_palco"):
             self.barra_palco.setRange(0, d); self.t_total_p.setText(mmss(d / 1000))
 
     def _estado(self, e):
         qual = "pause" if e == QMediaPlayer.PlayingState else "play"
         self.b_tocar.setIcon(M.icone_controle(qual, M.NOITE, 20))
-        if hasattr(self, "mini"):
-            self.mini.b_toc.setIcon(M.icone_controle(qual, M.NOITE, 16))
+        if self.mini is not None:
+            self.mini.poe_estado(qual == "pause")
         if hasattr(self, "p_toc"):
             self.p_toc.setIcon(M.icone_controle(qual, M.NOITE, 26))
 
@@ -1876,6 +1908,13 @@ def identidade_no_windows():
 
 if __name__ == "__main__":
     identidade_no_windows()
+    # o QtWebEngine (usado pelo miniplayer de vidro) exige contexto de GL
+    # compartilhado, e isso tem que ser dito ANTES de a QApplication nascer
+    try:
+        from PySide6.QtCore import QCoreApplication
+        QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+    except Exception:
+        pass
     app = QApplication(sys.argv)
     f = QFont("Segoe UI", 10)
     f.setStyleStrategy(QFont.PreferAntialias)       # sem isto o japones serrilha
