@@ -24,7 +24,7 @@ import io
 import json
 import os
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot, QPoint
+from PySide6.QtCore import QObject, Qt, QUrl, Signal, Slot, QPoint, QTimer
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QApplication
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
@@ -98,7 +98,10 @@ class Ponte(QObject):
 class MiniVidro(QWidget):
     """A janelinha. O vidro e HTML; o player continua sendo o Qt."""
 
-    LARGURA, ALTURA = 400, 74
+    # +28 nas duas medidas: e a margem transparente de 14px de cada lado, onde a
+    # sombra do vidro cai. Sem ela, a sombra era desenhada dentro da janela e
+    # aparecia como um quadrado escuro em volta do vidro arredondado.
+    LARGURA, ALTURA = 428, 102
 
     def __init__(self, pai):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -108,6 +111,10 @@ class MiniVidro(QWidget):
         self.setFixedSize(self.LARGURA, self.ALTURA)
         self._pegou = None
         self._pagina_pronta = False
+        self._fora_da_foto = False      # a janelinha some das capturas de tela
+        self._relogio_fundo = QTimer(self)
+        self._relogio_fundo.setInterval(500)
+        self._relogio_fundo.timeout.connect(self.fotografar_atras)
         self._atras_uri = ""
         self._dados = {"nome": "—", "capa": "", "pct": 0.0, "tocando": False}
 
@@ -123,11 +130,34 @@ class MiniVidro(QWidget):
         c.addWidget(self.view)
 
     # ---------------------------------------------------------------- fundo
+    def _sair_das_capturas(self):
+        """WDA_EXCLUDEFROMCAPTURE (Windows 10 2004+): a janelinha deixa de
+        aparecer em capturas de tela. E o que permite refotografar o fundo 2x por
+        segundo sem esconder nada — antes era preciso apagar a janela a cada foto,
+        o que pisca, e por isso a foto era tirada UMA vez e congelava.
+
+        Custo declarado: enquanto isso vale, o miniplayer nao aparece em gravacao
+        de tela nem em compartilhamento."""
+        if self._fora_da_foto:
+            return
+        if os.environ.get("ROXIN_TESTE_CAPTURA") == "1":
+            return        # em teste, deixo a janelinha aparecer nas capturas
+        try:
+            import ctypes
+            WDA_EXCLUDEFROMCAPTURE = 0x00000011
+            ok = ctypes.windll.user32.SetWindowDisplayAffinity(
+                int(self.winId()), WDA_EXCLUDEFROMCAPTURE)
+            self._fora_da_foto = bool(ok)
+        except Exception:
+            self._fora_da_foto = False
+        return self._fora_da_foto
+
     def fotografar_atras(self):
-        """Foto do que esta atras, tirada com a janelinha ESCONDIDA — se ela
-        estiver na tela, fotografa a si mesma e o vidro vira eco."""
+        """Foto do que esta atras. Com a janelinha fora das capturas, pode ser
+        tirada com ela na tela; se a API falhar, volta a esconder por um quadro."""
         tela = self.screen() or QApplication.primaryScreen()
-        estava = self.isVisible()
+        self._sair_das_capturas()
+        estava = self.isVisible() and not self._fora_da_foto
         if estava:
             self.setWindowOpacity(0.0)
             QApplication.processEvents()
@@ -148,6 +178,15 @@ class MiniVidro(QWidget):
         if estava:
             self.setWindowOpacity(1.0)
         self._mandar({"atras": self._atras_uri})
+
+    def showEvent(self, ev):
+        super().showEvent(ev)
+        self._sair_das_capturas()
+        self._relogio_fundo.start()      # o vidro passa a acompanhar o fundo
+
+    def hideEvent(self, ev):
+        super().hideEvent(ev)
+        self._relogio_fundo.stop()
 
     # ---------------------------------------------------------------- dados
     def _mandar(self, dados):

@@ -534,6 +534,39 @@ class Palco(QWidget):
             self.clicado.emit()
 
 
+def rolagem_suave(area, ms=260):
+    """Roda do mouse animada, em vez do salto seco do Qt.
+
+    Duas coisas: rolar POR PIXEL (o padrao do Qt rola por item, e item de 50px
+    salta) e animar o caminho ate o destino com a curva de assinatura do app.
+    Guarda a animacao no proprio widget para o coletor nao mata-la no meio.
+    """
+    area.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+    barra = area.verticalScrollBar()
+
+    def roda(ev):
+        passos = ev.angleDelta().y() / 120.0
+        if not passos:
+            return
+        alvo = barra.value() - int(passos * 3 * max(18, barra.singleStep() or 18))
+        alvo = max(barra.minimum(), min(barra.maximum(), alvo))
+        if alvo == barra.value():
+            return
+        a = getattr(area, "_anim_rolagem", None)
+        if a is not None:
+            a.stop()
+        a = QPropertyAnimation(barra, b"value")
+        a.setDuration(ms)
+        a.setStartValue(barra.value())
+        a.setEndValue(alvo)
+        a.setEasingCurve(QEasingCurve.OutCubic)
+        area._anim_rolagem = a
+        a.start(QAbstractAnimation.DeleteWhenStopped)
+        ev.accept()
+
+    area.wheelEvent = roda
+
+
 class Tabela(QTableWidget):
     """QTableWidget que avisa quando o Roger arrasta uma linha para outro lugar.
     O QTableWidget puro move as celulas e nao diz o que aconteceu — sem este
@@ -862,6 +895,7 @@ class Player(QMainWindow):
         for nome, itens in self.listas:
             QListWidgetItem("%s      %d" % (nome, len(itens)), self.lista_pls)
         self.lista_pls.currentRowChanged.connect(self._abre)
+        rolagem_suave(self.lista_pls, 220)
         self.lista_pls.setContextMenuPolicy(Qt.CustomContextMenu)
         self.lista_pls.customContextMenuRequested.connect(self._menu_playlist)
         cl.addWidget(self.lista_pls, 1)
@@ -915,6 +949,7 @@ class Player(QMainWindow):
         # a capinha entra so nas linhas que aparecem: com 1152 faixas, carregar
         # tudo de uma vez seguraria a tela
         self.tab.verticalScrollBar().valueChanged.connect(self._capas_a_vista)
+        rolagem_suave(self.tab)
         self.tab.cellDoubleClicked.connect(lambda r, c: self._toca_linha(r))
         self.tab.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tab.customContextMenuRequested.connect(self._menu_faixa)
@@ -953,6 +988,7 @@ class Player(QMainWindow):
         self.lista_fila.setContextMenuPolicy(Qt.CustomContextMenu)
         self.lista_fila.customContextMenuRequested.connect(self._menu_fila)
         self.lista_fila.itemDoubleClicked.connect(self._toca_da_fila)
+        rolagem_suave(self.lista_fila, 220)
         cf.addWidget(self.lista_fila, 1)
         linha.addWidget(self.painel_fila)
         self.painel_fila.setVisible(False)

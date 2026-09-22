@@ -33,3 +33,6 @@ retomar_roxin_madrugada.bat
 retomar_roxin_madrugada_log.txt
 retomar_prompt.txt
 Roxin.lnk
+# o exe e gerado por marcar_exe.py a partir do pythonw local
+Roxin.exe
+anzol/__pycache__/

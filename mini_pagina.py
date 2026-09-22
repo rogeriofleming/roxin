@@ -24,6 +24,7 @@ PAGINA = r"""<!doctype html>
   :root{
     --pena:#e9e5ef; --roxo:#a77cf0; --noite:#0f0c16;
     --raio:18px;
+    --margem:14px;      /* espaco transparente para a sombra caber */
     --borda:rgba(255,255,255,.22);
     --topo:rgba(255,255,255,.55);
   }
@@ -34,7 +35,7 @@ PAGINA = r"""<!doctype html>
   /* o vidro: o canvas roda o shader; quando WebGL falta, a reserva e o
      backdrop-filter da versao CSS da skill (estatico, mas nao feio) */
   #vidro{position:fixed;inset:0;border-radius:var(--raio);display:block}
-  #reserva{position:fixed;inset:0;border-radius:var(--raio);display:none;
+  #reserva{position:fixed;inset:var(--margem);border-radius:var(--raio);display:none;
     background:rgba(167,124,240,.20);
     -webkit-backdrop-filter:blur(10px) saturate(1.7);
     backdrop-filter:blur(10px) saturate(1.7)}
@@ -42,14 +43,14 @@ PAGINA = r"""<!doctype html>
   .semwebgl #reserva{display:block}
 
   /* moldura de vidro (camada 4 da skill: e ela que da volume de lente) */
-  #moldura{position:fixed;inset:0;border-radius:var(--raio);pointer-events:none;
+  #moldura{position:fixed;inset:var(--margem);border-radius:var(--raio);pointer-events:none;
     border:1px solid var(--borda);
     box-shadow:inset 0 1px 1px var(--topo),
                inset 0 -1px 1px rgba(255,255,255,.12),
                inset 0 0 22px rgba(255,255,255,.08),
                0 20px 50px rgba(0,0,0,.40)}
 
-  #conteudo{position:fixed;inset:0;display:flex;align-items:center;gap:12px;
+  #conteudo{position:fixed;inset:var(--margem);display:flex;align-items:center;gap:12px;
     padding:0 12px;box-sizing:border-box}
 
   #capa{width:50px;height:50px;border-radius:9px;object-fit:cover;flex:0 0 auto;
@@ -162,6 +163,7 @@ var FS = `
   uniform vec2 uSplatPos[10];
   uniform float uSplatTime[10];
   uniform float uRippleStrength;
+  uniform float uMargem;
 
   float sdRoundRect(vec2 p, vec2 b, float r){
     vec2 q = abs(p) - b + r;
@@ -183,7 +185,9 @@ var FS = `
     vec2 localPx = vUV * uRectSize;
     vec2 halfSize = uRectSize * 0.5;
     vec2 p = localPx - halfSize;
-    float d = sdRoundRect(p, halfSize, uRadius);
+    // o vidro para antes da borda da janela: a margem transparente e onde a
+    // sombra externa cai, e e ela que tira o "quadrado" em volta
+    float d = sdRoundRect(p, halfSize - vec2(uMargem), uRadius);
     float aa = 1.5;
     float mask = smoothstep(aa, -aa, d);
     if (mask < 0.01) discard;
@@ -224,14 +228,18 @@ var FS = `
     col.b = texture2D(uTexBlur, screenUV + dispUV - aberrUV).b;
 
     // tinta da marca: o vidro do Roxin e roxo, nao um espelho do fundo
-    col = mix(col, vec3(0.655, 0.486, 0.941), 0.26);   // #a77cf0
-    col = mix(col, vec3(0.059, 0.047, 0.086), 0.16);   // um fio de noite: texto le
-    col += rippleLight * 0.08;
+    // "menos transparente e mais roxo": a tinta da marca pesa mais que o fundo,
+    // e a noite entra atras para o vidro ter corpo em vez de ser um espelho
+    col = mix(col, vec3(0.459, 0.302, 0.722), 0.44);   // #754db8: mais um tom abaixo
+    col = mix(col, vec3(0.078, 0.051, 0.125), 0.32);   // e mais noite ainda atras
+    // sem brilho na crista da onda: ele pediu para tirar a luz do mouse.
+    // A deformacao continua (e agua, nao lampada).
 
     float rim = smoothstep(2.5, -2.5, d) - smoothstep(2.5, -2.5, d + 3.0);
     col += rim * (0.35 + 0.45 * (1.0 - vUV.y));
 
-    gl_FragColor = vec4(col, mask);
+    // alpha < 1: o vidro deixa passar o que esta atras DE VERDADE, nao so a foto
+    gl_FragColor = vec4(col, mask * 0.94);
   }`;
 
 var cv = document.getElementById("vidro");
@@ -271,7 +279,7 @@ function iniciar(){
   gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
   ["uTexBlur","uRectSize","uViewport","uRadius","uFalloff","uDispScale","uAberration",
    "uTime","uFlowStrength","uFlowScale","uFlowSpeed","uSplatPos","uSplatTime",
-   "uRippleStrength"].forEach(function(n){ locs[n] = gl.getUniformLocation(prog, n); });
+   "uRippleStrength","uMargem"].forEach(function(n){ locs[n] = gl.getUniformLocation(prog, n); });
   tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -287,9 +295,11 @@ function iniciar(){
 
 function redimensionar(){
   if (!gl) return;
-  cv.width  = Math.round(window.innerWidth  * DPR);
+  cv.width  = Math.round(window.innerWidth  * DPR);   // buffer, em pixels de verdade
   cv.height = Math.round(window.innerHeight * DPR);
-  gl.viewport(0, 0, cv.width, cv.height);
+  cv.style.width  = window.innerWidth  + "px";        // e o tamanho na tela: sem
+  cv.style.height = window.innerHeight + "px";        // isto o canvas fica DPR vezes
+  gl.viewport(0, 0, cv.width, cv.height);             // maior e sai do lugar
 }
 window.addEventListener("resize", redimensionar);
 
@@ -305,12 +315,13 @@ function poeFundo(uri){
     // Aqui a janelinha tem 400x74 e o fundo costuma ser texto fino: com 10px o
     // fundo vira mingau uniforme e deslocar mingau NAO aparece (medido: shader a
     // 60fps e duas capturas identicas). 4px deixa estrutura para a onda torcer.
-    ctx.filter = "blur(4px)";
+    ctx.filter = "blur(6px)";
     ctx.drawImage(img, 0, 0, c.width, c.height);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, c);
     temTextura = true;
+    window.__fundo = c;          // so para o teste conseguir olhar a textura
   };
   img.src = uri;
 }
@@ -339,11 +350,12 @@ function quadro(){
   gl.uniform2f(locs.uRectSize, cv.width, cv.height);
   gl.uniform2f(locs.uViewport, cv.width, cv.height);
   gl.uniform1f(locs.uRadius, 18 * DPR);
+  gl.uniform1f(locs.uMargem, 14 * DPR);
   gl.uniform1f(locs.uFalloff, 26 * DPR);
   gl.uniform1f(locs.uDispScale, 0.0);        // lente desligada (aprovado)
-  gl.uniform1f(locs.uAberration, 0.0);       // aberracao desligada (aprovado)
+  gl.uniform1f(locs.uAberration, 9.0 * DPR);  // um pouco, a pedido dele
   gl.uniform1f(locs.uTime, t);
-  gl.uniform1f(locs.uFlowStrength, 35 * DPR);
+  gl.uniform1f(locs.uFlowStrength, 50 * DPR);   // subiu: ele pediu mais deformacao
   gl.uniform1f(locs.uFlowScale, 0.012 / DPR);
   gl.uniform1f(locs.uFlowSpeed, 1.20);
   gl.uniform1f(locs.uRippleStrength, 8 * DPR);
@@ -371,5 +383,6 @@ window.atualizar = function (d) {
 };
 window.temVidro = function(){ return !!(gl && prog && temTextura); };
 window.quantosQuadros = function(){ return quadros; };
+window.dumpFundo = function(){ return window.__fundo ? window.__fundo.toDataURL("image/png") : ""; };
 </script>
 """
