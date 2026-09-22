@@ -53,14 +53,17 @@ def suave(alvo, prop, de, para, ms=MOV_PADRAO, curva=QEasingCurve.OutCubic, fim=
 
 
 def pulsa(widget, ms=MOV_CLIQUE):
-    """Feedback de clique: o widget pisca de leve. Nao mexe no layout."""
-    ef = widget.graphicsEffect()
-    if not isinstance(ef, QGraphicsOpacityEffect):
-        ef = QGraphicsOpacityEffect(widget)
-        widget.setGraphicsEffect(ef)
-    ef.setOpacity(1.0)
-    suave(ef, "opacity", 1.0, 0.45, ms // 2, QEasingCurve.OutCubic,
-          fim=lambda: suave(ef, "opacity", 0.45, 1.0, ms, QEasingCurve.OutCubic))
+    """Feedback de clique: o icone AFUNDA e volta. Opacidade de 150ms nao se ve —
+    movimento se ve. iconSize nao participa do layout, entao nada empurra a tela."""
+    if not hasattr(widget, "iconSize"):
+        return
+    cheio = widget.iconSize()
+    if cheio.width() < 8:
+        return
+    menor = QSize(max(6, int(cheio.width() * 0.76)), max(6, int(cheio.height() * 0.76)))
+    suave(widget, "iconSize", cheio, menor, ms // 2, QEasingCurve.OutCubic,
+          fim=lambda: suave(widget, "iconSize", menor, cheio,
+                            ms, QEasingCurve.OutBack))
 
 # ---------------------------------------------------------------- dados
 
@@ -1259,6 +1262,7 @@ class Player(QMainWindow):
 
         cp.addStretch(1)
         self.capa_palco = QLabel(); self.capa_palco.setAlignment(Qt.AlignCenter)
+        self.capa_palco.setScaledContents(False)
         cp.addWidget(self.capa_palco, 0, Qt.AlignHCenter)
 
         self.nome_palco = QLabel("—"); self.nome_palco.setObjectName("nomePalco")
@@ -1289,7 +1293,7 @@ class Player(QMainWindow):
             b.setIcon(M.icone_controle(qual, M.PENA, icone))
             b.setIconSize(QSize(icone, icone))
             b.clicked.connect(dono)
-            b.clicked.connect(lambda _=False, w=b: pulsa(w))
+            b.clicked.connect(lambda _=False, w=b: pulsa(w, 190))
             return b
 
         self.p_ale = bt("aleatorio", "Aleatório", self.b_ale.toggle, 42, icone=20)
@@ -1325,9 +1329,10 @@ class Player(QMainWindow):
             return
         f = self.faixas[self.tocando]
         lado = self._lado_da_capa()
-        pm = capa_livre(os.path.basename(f["p"]), lado)
-        self.capa_palco.setFixedSize(pm.size())
-        self.capa_palco.setPixmap(pm)
+        # a AREA e sempre quadrada (lado x lado) e a imagem se centraliza dentro:
+        # assim nome, barra e controles ficam na mesma altura em qualquer capa
+        self.capa_palco.setFixedSize(lado, lado)
+        self.capa_palco.setPixmap(capa_livre(os.path.basename(f["p"]), lado))
         self.nome_palco.setText(f["t"])
         self.sub_palco.setText(self.listas[self.lista_idx][0])
         self.barra_palco.setRange(0, self.mp.duration())
@@ -1346,6 +1351,31 @@ class Player(QMainWindow):
         ef = QGraphicsOpacityEffect(self.palco); self.palco.setGraphicsEffect(ef)
         suave(ef, "opacity", 0.0, 1.0, MOV_CONTEXTO, QEasingCurve.OutCubic,
               fim=lambda: self.palco.setGraphicsEffect(None))
+        self._capa_crescendo(0.88, 1.0, MOV_CONTEXTO + 40)
+
+    def _capa_crescendo(self, de, para, ms):
+        """A imagem escala dentro da area (que e fixa): da o movimento de entrada
+        sem empurrar nome e controles."""
+        from PySide6.QtCore import QVariantAnimation
+        if self.tocando < 0:
+            return
+        nome = os.path.basename(self.faixas[self.tocando]["p"])
+        lado = self._lado_da_capa()
+        a = QVariantAnimation(self)
+        a.setDuration(ms)
+        a.setStartValue(float(de))
+        a.setEndValue(float(para))
+        a.setEasingCurve(QEasingCurve.OutCubic)
+
+        def passo(v):
+            if not self._no_palco:
+                return
+            self.capa_palco.setPixmap(capa_livre(nome, max(40, int(lado * float(v)))))
+
+        a.valueChanged.connect(passo)
+        a.finished.connect(lambda: self._pinta_palco() if self._no_palco else None)
+        self._anim_capa = a          # sem guardar, o coletor mata no meio
+        a.start(QAbstractAnimation.DeleteWhenStopped)
 
     def _fecha_palco(self):
         if not self._no_palco:
@@ -1367,9 +1397,15 @@ class Player(QMainWindow):
     # -------------------------------------------------- lista
     def _abre(self, i):
         if i < 0: return
+        trocou = getattr(self, "lista_idx", None) != i
         self.lista_idx = i
         self.busca.blockSignals(True); self.busca.clear(); self.busca.blockSignals(False)
         self._filtra()
+        if trocou:
+            ef = QGraphicsOpacityEffect(self.tab)
+            self.tab.setGraphicsEffect(ef)
+            suave(ef, "opacity", 0.25, 1.0, 200, QEasingCurve.OutCubic,
+                  fim=lambda: self.tab.setGraphicsEffect(None))
 
     def _filtra(self):
         q = sem_acento(self.busca.text().strip())

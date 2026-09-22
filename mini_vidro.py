@@ -31,160 +31,8 @@ from PySide6.QtWebChannel import QWebChannel
 
 # ---------------------------------------------------------------- a pagina
 
-# O filtro e o CSS sao os da skill liquid-glass (assets/liquid-glass.css e a demo
-# ideias/liquid-glass-real.html): feTurbulence fractalNoise 0.006/0.009, 2 oitavas,
-# semente 12, feGaussianBlur 2 e feDisplacementMap scale 42, com blur(3px)
-# saturate(1.7). Nao mexer nesses numeros sem ele aprovar: sao os calibrados.
-PAGINA = """<!doctype html>
-<meta charset="utf-8">
-<style>
-  :root{
-    --lg-tint: 255,255,255;
-    --lg-tint-op: .05;
-    --lg-radius: 18px;
-    --lg-blur: 3px;
-    --lg-sat: 1.7;
-    --lg-border: rgba(255,255,255,.22);
-    --lg-highlight: rgba(255,255,255,.55);
-    --pena: #e9e5ef;
-    --roxo: #a77cf0;
-    --noite: #0f0c16;
-  }
-  html,body{margin:0;height:100%;background:transparent;overflow:hidden;
-    font-family:"Segoe UI","Yu Gothic UI",sans-serif;-webkit-user-select:none;user-select:none}
-
-  /* a foto do que esta atras da janela: e o "fundo" que o vidro refrata */
-  #atras{position:fixed;inset:0;background-size:cover;background-position:center;
-    border-radius:var(--lg-radius)}
-
-  /* ---- o vidro: classe .lg da skill, com a variante que refrata ---- */
-  .lg{
-    position:fixed;inset:0;
-    border-radius:var(--lg-radius);
-    background:rgba(var(--lg-tint), calc(var(--lg-tint-op) - .01));
-    border:1px solid var(--lg-border);
-    box-shadow:
-      inset 0 1px 1px var(--lg-highlight),
-      inset 0 -1px 1px rgba(255,255,255,.12),
-      inset 0 0 22px rgba(255,255,255,.08),
-      0 20px 50px rgba(0,0,0,.40);
-    overflow:hidden;isolation:isolate;
-    -webkit-backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-sat)) url(#lente);
-    backdrop-filter:blur(var(--lg-blur)) saturate(var(--lg-sat)) url(#lente);
-    display:flex;align-items:center;gap:12px;padding:0 12px 0 12px;
-    box-sizing:border-box;
-  }
-  /* aberracao cromatica na borda */
-  .lg::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
-    box-shadow:inset 1.5px 0 2px rgba(255,0,80,.45), inset -1.5px 0 2px rgba(0,180,255,.45);
-    mix-blend-mode:screen;opacity:.55}
-
-  #capa{width:50px;height:50px;border-radius:9px;object-fit:cover;flex:0 0 auto;
-    box-shadow:0 2px 10px rgba(0,0,0,.45);background:rgba(255,255,255,.06)}
-  .meio{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:6px;z-index:2}
-  #nome{color:var(--pena);font-size:13px;white-space:nowrap;overflow:hidden;
-    text-overflow:ellipsis;text-shadow:0 1px 3px rgba(0,0,0,.55)}
-  #trilha{height:3px;border-radius:2px;background:rgba(255,255,255,.22);cursor:pointer}
-  #cheio{height:100%;width:0;border-radius:2px;background:var(--roxo)}
-
-  .ctrl{display:flex;align-items:center;gap:6px;flex:0 0 auto;z-index:2}
-  button{border:none;background:transparent;cursor:pointer;padding:0;
-    width:28px;height:28px;border-radius:14px;display:grid;place-items:center;
-    transition:background .15s}
-  button:hover{background:rgba(255,255,255,.16)}
-  button svg{width:15px;height:15px;fill:var(--pena)}
-  #toc{width:32px;height:32px;border-radius:16px;background:var(--roxo)}
-  #toc:hover{background:#bb97f6}
-  #toc svg{fill:var(--noite);width:14px;height:14px}
-</style>
-
-<div id="atras"></div>
-
-<section class="lg" id="vidro">
-  <img id="capa" alt="">
-  <div class="meio">
-    <div id="nome">—</div>
-    <div id="trilha"><div id="cheio"></div></div>
-  </div>
-  <div class="ctrl">
-    <button id="ant" title="Anterior">
-      <svg viewBox="0 0 16 16"><path d="M4 2h2v12H4zM14 2v12L6.5 8z"/></svg>
-    </button>
-    <button id="toc" title="Tocar / pausar">
-      <svg id="icone" viewBox="0 0 16 16"><path d="M4 2l10 6-10 6z"/></svg>
-    </button>
-    <button id="prox" title="Próxima">
-      <svg viewBox="0 0 16 16"><path d="M10 2h2v12h-2zM2 2l7.5 6L2 14z"/></svg>
-    </button>
-  </div>
-</section>
-
-<svg width="0" height="0" style="position:absolute">
-  <filter id="lente" x="-20%" y="-20%" width="140%" height="140%">
-    <feTurbulence type="fractalNoise" baseFrequency="0.006 0.009" numOctaves="2"
-                  seed="12" result="n"/>
-    <feGaussianBlur in="n" stdDeviation="2" result="nb"/>
-    <feDisplacementMap in="SourceGraphic" in2="nb" scale="42"
-                       xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-</svg>
-
-<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
-<script>
-  var ponte = null;
-  window.addEventListener("load", function () {
-    if (typeof QWebChannel === "undefined") return;
-    new QWebChannel(qt.webChannelTransport, function (canal) {
-      ponte = canal.objects.ponte;
-      ponte.pronto();
-    });
-  });
-
-  document.getElementById("ant").onclick  = function(e){ e.stopPropagation(); ponte && ponte.anterior(); };
-  document.getElementById("toc").onclick  = function(e){ e.stopPropagation(); ponte && ponte.tocar(); };
-  document.getElementById("prox").onclick = function(e){ e.stopPropagation(); ponte && ponte.proxima(); };
-
-  // clicar na trilha pula para aquele ponto
-  document.getElementById("trilha").addEventListener("pointerdown", function(e){
-    e.stopPropagation();
-    var r = this.getBoundingClientRect();
-    ponte && ponte.buscar(Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)));
-  });
-
-  // arrastar a janelinha: o WebEngine come o mouse, entao o arraste vai pela ponte
-  var arrastando = false;
-  document.getElementById("vidro").addEventListener("pointerdown", function(e){
-    if (e.target.closest("button") || e.target.closest("#trilha")) return;
-    arrastando = true;
-    ponte && ponte.pegar(e.screenX, e.screenY);
-    this.setPointerCapture(e.pointerId);
-  });
-  document.addEventListener("pointermove", function(e){
-    if (arrastando && ponte) ponte.arrastar(e.screenX, e.screenY);
-  });
-  document.addEventListener("pointerup", function(){
-    if (!arrastando) return;
-    arrastando = false;
-    ponte && ponte.soltar();
-  });
-
-  // chamado pelo Python
-  window.atualizar = function (d) {
-    if (d.nome !== undefined) { document.getElementById("nome").textContent = d.nome;
-                                document.getElementById("nome").title = d.nome; }
-    if (d.capa !== undefined) document.getElementById("capa").src = d.capa;
-    if (d.pct  !== undefined) document.getElementById("cheio").style.width = (d.pct * 100) + "%";
-    if (d.tocando !== undefined) {
-      document.getElementById("icone").innerHTML = d.tocando
-        ? '<path d="M3.5 2h3.2v12H3.5zM9.3 2h3.2v12H9.3z"/>'
-        : '<path d="M4 2l10 6-10 6z"/>';
-    }
-    if (d.atras !== undefined) {
-      document.getElementById("atras").style.backgroundImage = "url('" + d.atras + "')";
-    }
-  };
-</script>
-"""
+# A pagina (shader WebGL + calibracao aprovada) vive em mini_pagina.py.
+from mini_pagina import PAGINA          # o HTML/WebGL do vidro mora la
 
 
 class Ponte(QObject):
@@ -198,6 +46,17 @@ class Ponte(QObject):
     def pronto(self):
         self.mini._pagina_pronta = True
         self.mini.mandar_tudo()
+
+    @Slot()
+    def voltar(self):
+        """Traz o Roxin para a frente e desmancha a janelinha na hora."""
+        pai = self.mini.pai
+        self.mini.hide()
+        if pai.isMinimized():
+            pai.showNormal()
+        pai.show()
+        pai.raise_()
+        pai.activateWindow()
 
     @Slot()
     def anterior(self):
