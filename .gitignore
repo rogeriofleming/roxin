@@ -23,3 +23,13 @@ _tela.png
 
 # backups do MusicBee e listas de apoio (nao sao do app)
 _backup_musicbee_e_listas/
+
+# o exe nao e mais o caminho de instalacao (Smart App Control bloqueia)
+build_novo/
+dist_novo/
+downloads/
+anzol/downloads/
+retomar_roxin_madrugada.bat
+retomar_roxin_madrugada_log.txt
+retomar_prompt.txt
+Roxin.lnk

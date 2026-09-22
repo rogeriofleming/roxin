@@ -6,11 +6,11 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[('duracoes.json', '.'), ('roxin.ico', '.')],
-    hiddenimports=[],
+    hiddenimports=['mutagen'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['PySide6.QtWebEngineCore', 'PySide6.QtWebEngineWidgets', 'PySide6.Qt3DCore', 'PySide6.QtCharts', 'PySide6.QtQuick', 'PySide6.QtQml', 'tkinter', 'numpy', 'PIL'],
+    excludes=[],
     noarchive=False,
     optimize=0,
 )
