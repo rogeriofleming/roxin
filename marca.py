@@ -101,14 +101,21 @@ def _caminhos_controle(nome):
         c.arcTo(QRectF(4.5, 4.5, 15, 15), 65, 300)
         p.addPath(_traco(c, 2.0))
         p.addPath(_ponta(17.4, 8.6, -35))
-    elif nome == "saida":                                   # alto-falante com onda
+    elif nome in ("saida", "som", "som_baixo", "mudo"):     # alto-falante
+        # um corpo so para os quatro: o que muda e quantas ondas saem dele
         p.moveTo(4, 9.5); p.lineTo(8, 9.5); p.lineTo(12.5, 5); p.lineTo(12.5, 19)
         p.lineTo(8, 14.5); p.lineTo(4, 14.5); p.closeSubpath()
-        for r in (3.4, 6.2):
+        ondas = {"saida": (3.4, 6.2), "som": (3.4, 6.2),
+                 "som_baixo": (3.4,), "mudo": ()}[nome]
+        for r in ondas:
             a = QPainterPath()
             a.arcMoveTo(QRectF(12.5 - r, 12 - r, r * 2, r * 2), -55)
             a.arcTo(QRectF(12.5 - r, 12 - r, r * 2, r * 2), -55, 110)
             p.addPath(_traco(a, 1.7))
+        if nome == "mudo":                                  # o X no lugar das ondas
+            for de, para in (((15.2, 9.2), (20.2, 14.2)), ((20.2, 9.2), (15.2, 14.2))):
+                c = QPainterPath(); c.moveTo(*de); c.lineTo(*para)
+                p.addPath(_traco(c, 1.8))
     return p
 
 

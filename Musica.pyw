@@ -425,6 +425,8 @@ QHeaderView::section { background:%(noite)s; color:#7b7290; border:none;
 #subPalco { color:%(fraca)s; font-size:13px; letter-spacing:1.4px; }
 #palcoBotao { background:transparent; border:none; border-radius:25px; }
 #palcoBotao:hover { background:#241d33; }
+#palcoSom { background:transparent; border:none; border-radius:15px; }
+#palcoSom:hover { background:#241d33; }
 #palcoTocar { background:%(ambar)s; border:none; border-radius:34px; }
 #palcoTocar:hover { background:%(ambarClaro)s; }
 
@@ -539,29 +541,42 @@ def rolagem_suave(area, ms=260):
 
     Duas coisas: rolar POR PIXEL (o padrao do Qt rola por item, e item de 50px
     salta) e animar o caminho ate o destino com a curva de assinatura do app.
-    Guarda a animacao no proprio widget para o coletor nao mata-la no meio.
+
+    UMA animacao por area, com a barra como dona, reaproveitada a cada roda.
+    Nao usar DeleteWhenStopped aqui: guardar a referencia de uma animacao que se
+    apaga sozinha ao parar deixa o atributo apontando para memoria liberada, e a
+    roda seguinte morre em access violation (Windows) ou "Internal C++ object
+    already deleted" -- que no pythonw nao aparece em lugar nenhum, entao o
+    sintoma e simplesmente a lista parar de rolar.
     """
     area.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
     barra = area.verticalScrollBar()
+
+    anim = QPropertyAnimation(barra, b"value", barra)   # dona: a barra
+    anim.setEasingCurve(QEasingCurve.OutCubic)
+    anim.setDuration(ms)
+    area._anim_rolagem = anim
 
     def roda(ev):
         passos = ev.angleDelta().y() / 120.0
         if not passos:
             return
-        alvo = barra.value() - int(passos * 3 * max(18, barra.singleStep() or 18))
+        # rolagem encadeada: se ainda esta animando, o proximo clique soma a
+        # partir do destino, senao a roda rapida perde cliques pelo caminho
+        atual = barra.value()
+        if anim.state() == QAbstractAnimation.Running:
+            fim = anim.endValue()
+            base = atual if fim is None else int(fim)
+        else:
+            base = atual
+        alvo = base - int(passos * 3 * max(18, barra.singleStep() or 18))
         alvo = max(barra.minimum(), min(barra.maximum(), alvo))
-        if alvo == barra.value():
+        if alvo == atual:
             return
-        a = getattr(area, "_anim_rolagem", None)
-        if a is not None:
-            a.stop()
-        a = QPropertyAnimation(barra, b"value")
-        a.setDuration(ms)
-        a.setStartValue(barra.value())
-        a.setEndValue(alvo)
-        a.setEasingCurve(QEasingCurve.OutCubic)
-        area._anim_rolagem = a
-        a.start(QAbstractAnimation.DeleteWhenStopped)
+        anim.stop()
+        anim.setStartValue(atual)
+        anim.setEndValue(alvo)
+        anim.start()
         ev.accept()
 
     area.wheelEvent = roda
@@ -1343,6 +1358,32 @@ class Player(QMainWindow):
             fc.addWidget(b)
         fc.addStretch(1)
         cp.addLayout(fc)
+
+        # volume — discreto, abaixo dos controles. O VALOR nao mora aqui: mora no
+        # slider do rodape (que e quem fala com a saida de audio); este e espelho,
+        # como ja acontece com os toggles de aleatorio e repetir
+        fv = QHBoxLayout(); fv.setContentsMargins(0, 20, 0, 0); fv.setSpacing(10)
+        self.p_som = QPushButton(); self.p_som.setObjectName("palcoSom")
+        self.p_som.setFixedSize(30, 30); self.p_som.setIconSize(QSize(18, 18))
+        self.p_som.setCursor(Qt.PointingHandCursor)
+        self.p_som.setToolTip("Mudo")
+        self.p_som.clicked.connect(self._mudo)
+        self.vol_palco = QSlider(Qt.Horizontal)
+        self.vol_palco.setRange(0, 100)
+        self.vol_palco.setFixedWidth(150)
+        self.vol_palco.setToolTip("Volume")
+        fv.addStretch(1); fv.addWidget(self.p_som); fv.addWidget(self.vol_palco)
+        fv.addStretch(1)
+        cp.addLayout(fv)
+
+        # espelho nos dois sentidos: o Qt nao reemite setValue com o mesmo valor,
+        # entao a ida e a volta param sozinhas — sem laco
+        self.vol.valueChanged.connect(self.vol_palco.setValue)
+        self.vol_palco.valueChanged.connect(self.vol.setValue)
+        self.vol.valueChanged.connect(self._pinta_som)
+        self.vol_palco.setValue(self.vol.value())
+        self._pinta_som(self.vol.value())
+
         cp.addStretch(1)
 
         # os dois modos espelham o estado dos toggles do rodape
@@ -1356,9 +1397,37 @@ class Player(QMainWindow):
         self._no_palco = False
         QShortcut(QKeySequence(Qt.Key_Escape), self, self._fecha_palco)
 
+    def _pinta_som(self, v):
+        """O icone conta o nivel: duas ondas, uma, ou o X do mudo."""
+        qual = "mudo" if v == 0 else ("som_baixo" if v < 50 else "som")
+        self.p_som.setIcon(M.icone_controle(qual, M.PENA, 18))
+        self.p_som.setToolTip("Tirar o mudo" if v == 0 else "Mudo")
+
+    def _mudo(self):
+        """Guarda o volume de antes para o clique seguinte devolver o mesmo som."""
+        if self.vol.value() > 0:
+            self._vol_antes = self.vol.value()
+            self.vol.setValue(0)
+        else:
+            self.vol.setValue(getattr(self, "_vol_antes", 0) or 80)
+
     def _lado_da_capa(self):
-        """A capa ocupa ~2/3 da janela, e o resto sobra para nome e controles."""
-        return max(200, int(min(self.height() * 0.62, self.width() * 0.56)))
+        """A capa ocupa ~2/3 da janela, e o resto sobra para nome e controles.
+
+        O teto pelo espaco que sobra nao e enfeite: nome, barra, controles e
+        volume tem altura propria, e a capa e a unica peca que pode ceder. Sem
+        descontar o resto, em janela baixa o nome sobe POR CIMA da capa -- foi o
+        que aconteceu ao acrescentar a linha de volume (24/09/2026).
+        """
+        ideal = int(min(self.height() * 0.62, self.width() * 0.56))
+        palco = getattr(self, "palco", None)
+        capa = getattr(self, "capa_palco", None)
+        if palco is not None and capa is not None:
+            resto = palco.sizeHint().height() - capa.height()   # tudo menos a capa
+            sobra = self.height() - resto
+            if sobra > 0:
+                ideal = min(ideal, sobra)
+        return max(120, ideal)
 
     def _pinta_palco(self):
         if self.tocando < 0:
@@ -1410,7 +1479,9 @@ class Player(QMainWindow):
 
         a.valueChanged.connect(passo)
         a.finished.connect(lambda: self._pinta_palco() if self._no_palco else None)
-        self._anim_capa = a          # sem guardar, o coletor mata no meio
+        # nao guardar em self: a animacao ja tem o Player como dono (QVariantAnimation(self)),
+        # entao o coletor nao a mata; guardar junto com DeleteWhenStopped e que deixaria um
+        # atributo apontando para objeto ja destruido -- o defeito que parou a rolagem da lista
         a.start(QAbstractAnimation.DeleteWhenStopped)
 
     def _fecha_palco(self):

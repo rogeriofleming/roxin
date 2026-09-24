@@ -36,3 +36,6 @@ Roxin.lnk
 # o exe e gerado por marcar_exe.py a partir do pythonw local
 Roxin.exe
 anzol/__pycache__/
+
+# backup dos .lnk originais, feito antes de carimbar o AppUserModelID
+_backup_lnk/
