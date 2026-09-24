@@ -83,7 +83,18 @@ poder ser testado** sem depender do foco real da máquina.
 Botão **Baixar** no rodapé abre uma faixa discreta no topo: cola o link, escolhe
 **MP3 192kbps** ou **Original (mais rápido)**, e o arquivo cai **direto em `D:\Music`**.
 Ao terminar, a faixa entra na biblioteca **sem reabrir o app** — com duração medida e
-capinha gerada — e, se a caixinha estiver marcada, também na playlist aberta.
+capinha buscada pelo id do vídeo (ver *Capas*) — e, se a caixinha estiver marcada, também
+na playlist aberta.
+
+⚠️ **Conserto de 24/09/2026 (s.341):** a tela dizia **"Não deu certo."** em arquivo grande,
+com o download inteiro no disco. Ela listava os status "em andamento" (`iniciando`,
+`baixando`, `convertendo`) e caía em erro para qualquer outro — mas o núcleo do Anzol nunca
+escreve `convertendo`: ele escreve **`processando`** e **`cancelando`**. Em arquivo pequeno
+a conclusão chegava dentro dos 400 ms do relógio e ninguém via a fase. Agora a lista é a dos
+status de **FIM** (`concluido`, `erro`, `cancelado`) e todo o resto é trabalho em andamento —
+vocabulário novo no motor não vira mais erro falso. Prova: `testes/teste_pescaria.py`,
+**12/12** no código de hoje contra **6/12** no antigo. A lei geral ficou no cofre, em
+`sistema/conhecimentos/contrato_de_estado_entre_camadas.md`.
 
 O motor é o **[Anzol](https://github.com/SkotAlexsander/anzol)**, do **Alex Skot**, licença
 MIT: só o `nucleo.py` (a interface Flask/pywebview dele não é usada, a tela é Qt). O
@@ -118,6 +129,34 @@ termina — sem isso, no notebook tudo apareceria sem capa. Para refazer à mão
 ```
 python capas.py --forcar
 ```
+
+### Capa do que foi baixado do YouTube (24/09/2026)
+
+O que sai do Anzol nasce **sem imagem embutida**: o yt-dlp só guarda a miniatura se
+mandarem, e o motor não manda. Mas o nome do arquivo termina em `[<id>]`, e com o id a
+miniatura se busca direto (`i.ytimg.com`, só leitura, sem chave). O app faz isso sozinho
+ao fim de cada download, em thread própria — no relógio da pescaria, que bate a cada
+400 ms, a janela congelaria esperando a rede. Para o acervo antigo:
+
+```
+python capas.py --youtube
+```
+
+Ordem das miniaturas: `maxresdefault` (1280×720) e, se o vídeo não tiver, `mqdefault`
+(320×180). `hqdefault` e `sddefault` ficam de fora de propósito — vêm com **tarja preta**
+em cima e embaixo, que viraria borda preta dentro da capa.
+
+⚠️ **Esta imagem é CORTADA em quadrado, pelo centro** — e isso é o **oposto** do que a
+seção acima diz sobre a capa embutida. As duas decisões convivem de propósito, com escopos
+diferentes:
+
+| Origem da imagem | O que se faz | Quando foi decidido |
+|---|---|---|
+| **embutida no arquivo** (o acervo antigo) | encaixa inteira na moldura, **sem cortar** | 21/09/2026 — cortar decepava a arte de 529 imagens que já estavam lá |
+| **buscada na web** pelo id (download novo) | **corta quadrado do centro** ao gravar no cache | 24/09/2026 — decisão do Roger, com o custo do corte cego na mesa |
+
+Se um dia as duas tiverem de virar uma só, a pergunta é a mesma: vale mais o alinhamento
+da grade ou a integridade de cada arte? Hoje a resposta é diferente para cada origem.
 
 ### Capa que não está no arquivo
 

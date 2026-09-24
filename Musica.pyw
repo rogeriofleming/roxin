@@ -209,6 +209,17 @@ def anzol():
     return None
 
 
+#: status em que o Anzol para de trabalhar. TUDO o que nao esta aqui e trabalho
+#: em andamento -- a lista precisa ser esta, e nao a dos status "em andamento":
+#: o nucleo escreve "processando" e "cancelando", nomes que a tela nao conhecia,
+#: e um .m4a de 298 MB terminava com "Nao deu certo" e o arquivo inteiro no
+#: disco (24/09/2026). Vocabulario novo no motor nunca mais vira erro falso.
+FIM_DA_PESCA = ("concluido", "erro", "cancelado")
+
+#: fase do trabalho que merece nome proprio na tela
+FASE_PESCA = {"processando": "convertendo…", "cancelando": "cancelando…"}
+
+
 # ---------------------------------------------------------------- escrever playlist
 
 def pasta_backup():
@@ -310,6 +321,30 @@ class Capeiro(QThread):
             self.pronto.emit(com)
         except Exception:
             self.pronto.emit(0)      # falhou: fica so o passaro, o app nao quebra
+
+
+class CapaDaWeb(QThread):
+    """Capa das musicas recem-baixadas. O que vem do Anzol nasce SEM imagem
+    embutida (o yt-dlp so guarda a miniatura se mandarem, e o motor nao manda),
+    entao a capa e buscada pelo id que ficou no nome do arquivo.
+
+    Thread propria porque isso e rede: chamado no relogio da pescaria, que bate
+    a cada 400 ms, a janela ficaria congelada ate a imagem chegar."""
+    pronto = Signal(int)
+
+    def __init__(self, dono, nomes):
+        super().__init__(dono)
+        self._nomes = list(nomes)
+
+    def run(self):
+        feitas = 0
+        for nome in self._nomes:
+            try:
+                if CP.capa_do_youtube(nome):
+                    feitas += 1
+            except Exception:
+                pass          # sem capa aparece o passaro: o app nao quebra
+        self.pronto.emit(feitas)
 
 
 def capa(nome_arquivo, tam, canto=None):
@@ -1172,14 +1207,29 @@ class Player(QMainWindow):
             suave(self.pescaria, "maximumHeight", 0, alvo, MOV_PADRAO,
                   fim=lambda: self.pescaria.setMaximumHeight(16777215))
             self.link.setFocus()
-            nome, _itens, arq = self._lista_atual()
-            self.na_playlist.setEnabled(bool(arq))
-            self.na_playlist.setText("pôr também em “%s”" % nome if arq
-                                     else "pôr numa playlist (abra uma primeiro)")
+            self._alvo_na_tela()
         else:
             suave(self.pescaria, "maximumHeight", self.pescaria.height(), 0,
                   MOV_PADRAO, QEasingCurve.InCubic,
                   fim=lambda: self.pescaria.setVisible(False))
+
+    def _alvo_na_tela(self):
+        """Re-le a playlist aberta AGORA para a caixa "por tambem em X".
+
+        Isto so era calculado no instante em que o painel de baixar abria: quem
+        abria o painel e depois entrava numa playlist ficava com a caixa cinza
+        dizendo "abra uma primeiro" com a playlist aberta na tela (24/09/2026).
+        As listas virtuais ("Todas as musicas", "Fora das playlists") nao tem
+        .m3u para escrever -- ai a caixa fica cinza mesmo, mas dizendo por que.
+        """
+        nome, _itens, arq = self._lista_atual()
+        self.na_playlist.setEnabled(bool(arq))
+        if arq:
+            self.na_playlist.setText("pôr também em “%s”" % nome)
+        else:
+            self.na_playlist.setChecked(False)
+            self.na_playlist.setText("“%s” não é uma playlist — abra uma para marcar"
+                                     % nome)
 
     def _recado(self, texto, cor=None):
         self.recado_pesca.setText(texto)
@@ -1231,20 +1281,25 @@ class Player(QMainWindow):
             self._relogio_pesca.stop(); self._fim_da_pesca(); return
         titulo = j.get("titulo") or ""
         st = j.get("status")
-        if st in ("iniciando", "baixando", "convertendo"):
+        if st not in FIM_DA_PESCA:
             partes = [titulo or "baixando…"]
-            if j.get("pct"):
-                partes.append("%.0f%%" % j["pct"])
-            if j.get("velocidade"):
-                partes.append(str(j["velocidade"]))
-            if j.get("eta"):
-                partes.append("faltam %s" % j["eta"])
+            fase = FASE_PESCA.get(st)
+            if fase:
+                partes.append(fase)      # ja baixou: ffmpeg/pos-processamento
+            else:
+                if j.get("pct"):
+                    partes.append("%.0f%%" % j["pct"])
+                if j.get("velocidade"):
+                    partes.append(str(j["velocidade"]))
+                if j.get("eta"):
+                    partes.append("faltam %s" % j["eta"])
             self._recado("  ·  ".join(partes))
             return
         self._relogio_pesca.stop()
         if st == "concluido":
             nomes = [a["nome"] for a in (j.get("arquivos") or [])]
             entraram = [x for x in (self._guardar_pescado(nm) for nm in nomes) if x is not None]
+            self._busca_capas(nomes)
             if entraram:
                 self._recado("Pronto: %s — já está no app." % ", ".join(
                     self.faixas[i]["t"] for i in entraram), M.AMBAR)
@@ -1257,6 +1312,19 @@ class Player(QMainWindow):
         else:
             self._recado(j.get("erro") or "Não deu certo.", "#e8834a")
         self._fim_da_pesca()
+
+    def _busca_capas(self, nomes):
+        """Sai atras da capa do que acabou de ser baixado, em segundo plano.
+
+        O sinal cai no mesmo `_capas_prontas` do Capeiro: ele ja sabe limpar o
+        cache do Qt e repintar as linhas que estao na tela.
+        """
+        nomes = [n for n in nomes if CP.id_no_nome(n)]
+        if not nomes:
+            return
+        self._capa_web = CapaDaWeb(self, nomes)     # guardado: sem referencia,
+        self._capa_web.pronto.connect(self._capas_prontas)   # o Qt coleta a thread
+        self._capa_web.start()
 
     def _fim_da_pesca(self):
         self._job = None
@@ -1506,6 +1574,8 @@ class Player(QMainWindow):
         if i < 0: return
         trocou = getattr(self, "lista_idx", None) != i
         self.lista_idx = i
+        if getattr(self, "pescaria", None) is not None and self.pescaria.isVisible():
+            self._alvo_na_tela()        # trocar de lista com o painel aberto
         self.busca.blockSignals(True); self.busca.clear(); self.busca.blockSignals(False)
         self._filtra()
         if trocou:
