@@ -18,13 +18,34 @@ getBoundingClientRect() em handler de alta frequencia — o canvas cobre a janel
 inteira, entao a posicao local do ponteiro sai de offsetX/offsetY, sem tocar o DOM.
 """
 
-PAGINA = r"""<!doctype html>
+# A margem transparente e a MESMA coisa em tres lugares (CSS, shader e tamanho da
+# janela em mini_vidro.py). Por isso o numero mora aqui, uma vez so.
+#
+# REGRA DA SOMBRA (o quadrado que o Roger via, consertado em 24/09/2026): a janela
+# e transparente, mas o Windows NAO desenha nada fora dela — a sombra que pedir mais
+# espaco do que esta margem e cortada em linha reta na borda, e o corte aparece como
+# um quadrado escuro em volta do vidro arredondado. MEDIDO no Chrome (nao deduzido da
+# spec, que fala de B/2): um box-shadow `0 Ypx Bpx` alcanca cerca de B para os lados e
+# Y + B para baixo. Logo, a conta que o teste cobra:
+#
+#     deslocamento + blur  <=  MARGEM
+#
+# A sombra antiga era `0 20px 50px`: pedia 70px embaixo dentro de 14px de folga.
+# Medido antes do conserto: alfa 62 na borda de baixo e 26 nas laterais (o quadrado).
+# Quem trava isto e `testes/teste_sombra_mini.py`.
+#
+# Custo declarado de aumentar a margem: a janela fica maior do que o vidro que se ve
+# (460x134 para um vidro de 400x74), e essa moldura invisivel engole clique — quem
+# clicar nela nao clica no que esta atras. Foi o preco de nao ver o quadrado.
+MARGEM = 30
+
+_TEMPLATE = r"""<!doctype html>
 <meta charset="utf-8">
 <style>
   :root{
     --pena:#e9e5ef; --roxo:#a77cf0; --noite:#0f0c16;
     --raio:18px;
-    --margem:14px;      /* espaco transparente para a sombra caber */
+    --margem:__MARGEM__px;  /* espaco transparente para a sombra caber */
     --borda:rgba(255,255,255,.22);
     --topo:rgba(255,255,255,.55);
   }
@@ -48,7 +69,10 @@ PAGINA = r"""<!doctype html>
     box-shadow:inset 0 1px 1px var(--topo),
                inset 0 -1px 1px rgba(255,255,255,.12),
                inset 0 0 22px rgba(255,255,255,.08),
-               0 20px 50px rgba(0,0,0,.40)}
+               /* as duas de fora CABEM na margem (ver a REGRA DA SOMBRA acima):
+                  6+20 = 26 e 2+5 = 7, ambas <= 30, com folga */
+               0 6px 20px rgba(0,0,0,.50),
+               0 2px 5px rgba(0,0,0,.30)}
 
   #conteudo{position:fixed;inset:var(--margem);display:flex;align-items:center;gap:12px;
     padding:0 12px;box-sizing:border-box}
@@ -350,7 +374,7 @@ function quadro(){
   gl.uniform2f(locs.uRectSize, cv.width, cv.height);
   gl.uniform2f(locs.uViewport, cv.width, cv.height);
   gl.uniform1f(locs.uRadius, 18 * DPR);
-  gl.uniform1f(locs.uMargem, 14 * DPR);
+  gl.uniform1f(locs.uMargem, __MARGEM__ * DPR);
   gl.uniform1f(locs.uFalloff, 26 * DPR);
   gl.uniform1f(locs.uDispScale, 0.0);        // lente desligada (aprovado)
   gl.uniform1f(locs.uAberration, 9.0 * DPR);  // um pouco, a pedido dele
@@ -386,3 +410,5 @@ window.quantosQuadros = function(){ return quadros; };
 window.dumpFundo = function(){ return window.__fundo ? window.__fundo.toDataURL("image/png") : ""; };
 </script>
 """
+
+PAGINA = _TEMPLATE.replace("__MARGEM__", str(MARGEM))

@@ -32,7 +32,7 @@ from PySide6.QtWebChannel import QWebChannel
 # ---------------------------------------------------------------- a pagina
 
 # A pagina (shader WebGL + calibracao aprovada) vive em mini_pagina.py.
-from mini_pagina import PAGINA          # o HTML/WebGL do vidro mora la
+from mini_pagina import PAGINA, MARGEM   # o HTML/WebGL do vidro mora la
 
 
 class Ponte(QObject):
@@ -98,10 +98,11 @@ class Ponte(QObject):
 class MiniVidro(QWidget):
     """A janelinha. O vidro e HTML; o player continua sendo o Qt."""
 
-    # +28 nas duas medidas: e a margem transparente de 14px de cada lado, onde a
-    # sombra do vidro cai. Sem ela, a sombra era desenhada dentro da janela e
-    # aparecia como um quadrado escuro em volta do vidro arredondado.
-    LARGURA, ALTURA = 428, 102
+    # A janela e o vidro MAIS a margem transparente dos dois lados, onde a sombra
+    # cai. Sem folga suficiente o Windows corta a sombra na borda da janela, e o
+    # corte aparece como um quadrado escuro em volta do vidro arredondado.
+    VIDRO_L, VIDRO_A = 400, 74
+    LARGURA, ALTURA = VIDRO_L + 2 * MARGEM, VIDRO_A + 2 * MARGEM
 
     def __init__(self, pai):
         super().__init__(None, Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -227,7 +228,18 @@ class MiniVidro(QWidget):
         return "data:image/png;base64," + base64.b64encode(bytes(ba)).decode("ascii")
 
     # ---------------------------------------------------------------- lugar
+    # O lugar que importa e o do VIDRO, nao o da janela: a janela tem a margem
+    # transparente em volta, e se a margem mudar de tamanho um dia, uma posicao
+    # guardada em coordenada de janela faz o vidro andar sozinho na tela.
+    def lugar_do_vidro(self):
+        return self.pos() + QPoint(MARGEM, MARGEM)
+
+    def poe_lugar_do_vidro(self, x, y):
+        self.move(QPoint(int(x) - MARGEM, int(y) - MARGEM))
+
     def no_cantinho(self):
+        """18px entre o VIDRO e o canto da area util — a margem nao conta."""
         tela = self.screen() or QApplication.primaryScreen()
         a = tela.availableGeometry()
-        self.move(a.right() - self.width() - 18, a.bottom() - self.height() - 18)
+        self.move(a.right() - self.width() + MARGEM - 18,
+                  a.bottom() - self.height() + MARGEM - 18)

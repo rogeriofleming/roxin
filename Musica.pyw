@@ -24,6 +24,9 @@ CAPA_LISTA  = 40          # capinha ao lado de cada musica
 CAPA_RODAPE = 58          # capa da que esta tocando, no canto
 CAPA_FILA   = 30          # capinha dentro do painel "a seguir"
 CAPA_MINI   = 50          # capa dentro do miniplayer sobreposto
+TORRE_SOM   = 30          # largura da coluna de volume em pe, ao lado da capa
+VAO_SOM     = 22          # respiro entre a capa e essa coluna
+TORRE_TETO  = 260         # altura maxima da coluna (capa enorme nao vira termometro)
 
 # Padrao de movimento (skill motion-design, arquetipo Premium): uma curva de
 # assinatura e tres duracoes. Nada de inventar tempo caso a caso.
@@ -462,6 +465,14 @@ QHeaderView::section { background:%(noite)s; color:#7b7290; border:none;
 #palcoBotao:hover { background:#241d33; }
 #palcoSom { background:transparent; border:none; border-radius:15px; }
 #palcoSom:hover { background:#241d33; }
+/* o volume em pe: o QSS horizontal la de baixo nao vale para o vertical, e sem
+   estas quatro linhas o slider volta ao cinza nativo do Windows */
+#volPalco::groove:vertical { width:4px; background:#2a2338; border-radius:2px; }
+#volPalco::sub-page:vertical { background:#2a2338; border-radius:2px; }
+#volPalco::add-page:vertical { background:%(ambar)s; border-radius:2px; }
+#volPalco::handle:vertical { background:%(pena)s; width:11px; height:11px;
+    margin:0 -4px; border-radius:5px; }
+#volPalco::handle:vertical:hover { background:#ffffff; }
 #palcoTocar { background:%(ambar)s; border:none; border-radius:34px; }
 #palcoTocar:hover { background:%(ambarClaro)s; }
 
@@ -867,6 +878,14 @@ class Mini(QWidget):
         tela = self.screen() or QApplication.primaryScreen()
         a = tela.availableGeometry()
         self.move(a.right() - self.width() - 18, a.bottom() - self.height() - 18)
+
+    # este mini nao tem margem transparente: a janela E o vidro (mesma API do de
+    # vidro, para o Player nao precisar saber qual esta em uso)
+    def lugar_do_vidro(self):
+        return self.pos()
+
+    def poe_lugar_do_vidro(self, x, y):
+        self.move(QPoint(int(x), int(y)))
 
 
 class Player(QMainWindow):
@@ -1380,9 +1399,39 @@ class Player(QMainWindow):
         cp.setContentsMargins(40, 26, 40, 30); cp.setSpacing(0)
 
         cp.addStretch(1)
+
+        # A capa no meio e o volume EM PE do lado direito dela (pedido do Roger em
+        # 24/09/2026: deitado embaixo, ele roubava altura da capa). O espacador da
+        # esquerda tem a largura exata da coluna da direita — e o contrapeso que
+        # mantem a capa no centro da janela, alinhada com o nome e os controles.
         self.capa_palco = QLabel(); self.capa_palco.setAlignment(Qt.AlignCenter)
         self.capa_palco.setScaledContents(False)
-        cp.addWidget(self.capa_palco, 0, Qt.AlignHCenter)
+
+        self.torre_som = QWidget()
+        tv = QVBoxLayout(self.torre_som)
+        tv.setContentsMargins(0, 0, 0, 0); tv.setSpacing(12)
+        self.vol_palco = QSlider(Qt.Vertical)
+        self.vol_palco.setObjectName("volPalco")
+        self.vol_palco.setRange(0, 100)
+        self.vol_palco.setFixedWidth(TORRE_SOM)
+        self.vol_palco.setToolTip("Volume")
+        self.p_som = QPushButton(); self.p_som.setObjectName("palcoSom")
+        self.p_som.setFixedSize(TORRE_SOM, TORRE_SOM)
+        self.p_som.setIconSize(QSize(18, 18))
+        self.p_som.setCursor(Qt.PointingHandCursor)
+        self.p_som.setToolTip("Mudo")
+        self.p_som.clicked.connect(self._mudo)
+        tv.addWidget(self.vol_palco, 1, Qt.AlignHCenter)
+        tv.addWidget(self.p_som, 0, Qt.AlignHCenter)
+
+        fcapa = QHBoxLayout(); fcapa.setContentsMargins(0, 0, 0, 0); fcapa.setSpacing(0)
+        fcapa.addStretch(1)
+        fcapa.addSpacing(TORRE_SOM + VAO_SOM)        # contrapeso: capa no centro
+        fcapa.addWidget(self.capa_palco)
+        fcapa.addSpacing(VAO_SOM)
+        fcapa.addWidget(self.torre_som, 0, Qt.AlignVCenter)
+        fcapa.addStretch(1)
+        cp.addLayout(fcapa)
 
         self.nome_palco = QLabel("—"); self.nome_palco.setObjectName("nomePalco")
         self.nome_palco.setAlignment(Qt.AlignCenter)
@@ -1427,23 +1476,9 @@ class Player(QMainWindow):
         fc.addStretch(1)
         cp.addLayout(fc)
 
-        # volume — discreto, abaixo dos controles. O VALOR nao mora aqui: mora no
-        # slider do rodape (que e quem fala com a saida de audio); este e espelho,
-        # como ja acontece com os toggles de aleatorio e repetir
-        fv = QHBoxLayout(); fv.setContentsMargins(0, 20, 0, 0); fv.setSpacing(10)
-        self.p_som = QPushButton(); self.p_som.setObjectName("palcoSom")
-        self.p_som.setFixedSize(30, 30); self.p_som.setIconSize(QSize(18, 18))
-        self.p_som.setCursor(Qt.PointingHandCursor)
-        self.p_som.setToolTip("Mudo")
-        self.p_som.clicked.connect(self._mudo)
-        self.vol_palco = QSlider(Qt.Horizontal)
-        self.vol_palco.setRange(0, 100)
-        self.vol_palco.setFixedWidth(150)
-        self.vol_palco.setToolTip("Volume")
-        fv.addStretch(1); fv.addWidget(self.p_som); fv.addWidget(self.vol_palco)
-        fv.addStretch(1)
-        cp.addLayout(fv)
-
+        # O VALOR do volume nao mora aqui: mora no slider do rodape (que e quem fala
+        # com a saida de audio). O do palco e espelho, como os toggles de aleatorio
+        # e repetir.
         # espelho nos dois sentidos: o Qt nao reemite setValue com o mesmo valor,
         # entao a ida e a volta param sozinhas — sem laco
         self.vol.valueChanged.connect(self.vol_palco.setValue)
@@ -1482,10 +1517,12 @@ class Player(QMainWindow):
     def _lado_da_capa(self):
         """A capa ocupa ~2/3 da janela, e o resto sobra para nome e controles.
 
-        O teto pelo espaco que sobra nao e enfeite: nome, barra, controles e
-        volume tem altura propria, e a capa e a unica peca que pode ceder. Sem
-        descontar o resto, em janela baixa o nome sobe POR CIMA da capa -- foi o
-        que aconteceu ao acrescentar a linha de volume (24/09/2026).
+        O teto pelo espaco que sobra nao e enfeite: nome, barra e controles tem
+        altura propria, e a capa e a unica peca que pode ceder. Sem descontar o
+        resto, em janela baixa o nome sobe POR CIMA da capa -- foi o que aconteceu
+        quando o volume era uma linha deitada a mais (24/09/2026). Com o volume em
+        pe AO LADO da capa, ele nao entra nesta conta: a coluna nunca passa da
+        altura da capa (ver `_pinta_palco`), entao quem manda na linha e a capa.
         """
         ideal = int(min(self.height() * 0.62, self.width() * 0.56))
         palco = getattr(self, "palco", None)
@@ -1506,6 +1543,9 @@ class Player(QMainWindow):
         # assim nome, barra e controles ficam na mesma altura em qualquer capa
         self.capa_palco.setFixedSize(lado, lado)
         self.capa_palco.setPixmap(capa_livre(os.path.basename(f["p"]), lado))
+        # a coluna do volume acompanha a capa, com teto: numa capa enorme um slider
+        # de 500px viraria termometro
+        self.torre_som.setFixedHeight(min(lado, TORRE_TETO))
         self.nome_palco.setText(f["t"])
         self.sub_palco.setText(self.listas[self.lista_idx][0])
         self.barra_palco.setRange(0, self.mp.duration())
@@ -1622,8 +1662,13 @@ class Player(QMainWindow):
         except Exception as e:
             self.mini = Mini(self)
             self._tipo_mini = "pintado a mao (sem QtWebEngine: %s)" % e
-        lugar = self._ajustes.get("mini_lugar")
-        self.mini.move(QPoint(*lugar)) if lugar else self.mini.no_cantinho()
+        # `mini_lugar_vidro` e o canto do VIDRO que se ve, nao o da janela (que tem
+        # margem transparente em volta). A chave velha `mini_lugar` guardava o canto
+        # da janela e por isso e ignorada: com a margem nova ela poria o vidro fora
+        # do lugar. Quem so tiver a chave velha cai no cantinho (e arrasta uma vez);
+        # o lugar que o Roger tinha foi convertido na mao ao fazer a troca.
+        lugar = self._ajustes.get("mini_lugar_vidro")
+        self.mini.poe_lugar_do_vidro(*lugar) if lugar else self.mini.no_cantinho()
         return self.mini
 
     def _liga_mini(self, on):
@@ -1634,8 +1679,9 @@ class Player(QMainWindow):
     def _guarda_lugar_do_mini(self):
         if self.mini is None:
             return
-        pt = self.mini.pos()
-        self._ajustes["mini_lugar"] = [pt.x(), pt.y()]
+        pt = self.mini.lugar_do_vidro()
+        self._ajustes["mini_lugar_vidro"] = [pt.x(), pt.y()]
+        self._ajustes.pop("mini_lugar", None)      # a chave velha nao serve mais
         gravar_ajustes(self._ajustes)
 
     def _decide_mini(self, aqui=None):

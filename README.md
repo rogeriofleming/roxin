@@ -39,6 +39,8 @@ acervo, e mostra **só nome e duração**.
 | `marca.py` | identidade: paleta, o pássaro em vetor, e a pintura da barra de título |
 | `roxin.ico` | ícone com 7 tamanhos (16 a 256px), gerado a partir do vetor |
 | `capas.py` | monta o cache de capinhas a partir da imagem embutida nas músicas |
+| `mini_vidro.py` | a janelinha do miniplayer: janela Qt transparente que hospeda a página |
+| `mini_pagina.py` | o vidro líquido do miniplayer (HTML + WebGL) e a **margem da sombra** |
 | `anzol/nucleo.py` | motor de download (yt-dlp), do Anzol — **com o `LICENSE`, que a MIT exige** |
 | `buscar_capas.py` | procura capa quadrada de verdade na busca pública da Apple |
 | `duracoes.json` | durações já medidas, para as faixas que não vêm de playlist |
@@ -77,6 +79,49 @@ Detalhes que o fazem se comportar:
 O gatilho é o `changeEvent` da janela principal (`ActivationChange` e
 `WindowStateChange`). `_decide_mini(aqui=...)` aceita o estado por parâmetro **para
 poder ser testado** sem depender do foco real da máquina.
+
+### A sombra e a margem invisível (conserto de 24/09/2026)
+
+O Roger viu **um quadrado de sombra** em volta da janelinha arredondada. A causa: a
+janela é transparente, mas o Windows **não desenha nada fora dela** — a sombra do
+vidro é um `box-shadow` desenhado DENTRO da janela, e a sombra antiga (`0 20px 50px`)
+pedia ~70px de espaço embaixo dentro de uma margem transparente de **14px**. O resto
+era cortado em linha reta: o quadrado.
+
+A regra que ficou (em `mini_pagina.py`, medida no Chrome — a spec fala em `blur/2`, o
+que **não** bate com o que o motor desenha):
+
+> **deslocamento + blur ≤ MARGEM**
+
+Hoje: margem **30px** e sombra `0 6px 20px` + `0 2px 5px`. A janela tem **460×134**
+para um vidro de **400×74**.
+
+**Custo declarado:** a moldura invisível cresceu de 14 para 30px de cada lado, e ela
+**engole clique** — quem clicar nela não clica no que está atrás. Foi o preço de a
+sombra caber.
+
+Quem trava isso: `python testes/teste_sombra_mini.py` — ele fotografa a página num
+Chrome de verdade **com canal alfa** e reprova se o pixel da borda não for
+transparente. Antes do conserto: alfa 62 embaixo e 26 nas laterais. Depois: 1 e 0.
+
+O lugar guardado em `ajustes.json` passou a ser o canto do **vidro** (chave
+`mini_lugar_vidro`), não o da janela — assim, se a margem mudar de novo, a janelinha
+fica onde ele deixou. Travado por `python testes/teste_mini_lugar.py`.
+
+## Capa cheia (o palco)
+
+Clicar na música que toca abre a capa grande. A capa ocupa até **62% da altura** da
+janela, e o que sobra é de nome, barra e controles — ela é a única peça que cede.
+
+**O volume fica EM PÉ, à direita da capa** (pedido de 24/09/2026). Antes era uma linha
+deitada abaixo dos controles, e essa linha entrava na conta da altura: em janela baixa
+a capa encolhia para caber. Medido na janela mínima (720×460): a capa foi de **172px
+para 222px**. Um espaçador da mesma largura da coluna, do lado esquerdo, é o contrapeso
+que mantém a capa no centro da janela.
+
+O **valor** do volume mora num lugar só: o slider do rodapé, que é quem fala com a
+saída de áudio. O do palco é espelho — como os toggles de aleatório e repetir.
+Travado por `python testes/teste_volume_palco.py`.
 
 ## Baixar música (o Anzol embutido)
 

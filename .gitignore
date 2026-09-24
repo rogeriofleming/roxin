@@ -39,3 +39,6 @@ anzol/__pycache__/
 
 # backup dos .lnk originais, feito antes de carimbar o AppUserModelID
 _backup_lnk/
+
+# fotos e rascunhos que os testes geram ao conferir o visual
+tmp/
