@@ -42,3 +42,11 @@ _backup_lnk/
 
 # fotos e rascunhos que os testes geram ao conferir o visual
 tmp/
+
+# dados do acervo pessoal — cache de duracoes e relatorios de capas.
+# o app roda sem eles (cache_duracoes() devolve {} se faltar)
+duracoes.json
+capas_cena_trocada.md
+
+# notas internas de sessao, nao sao documentacao do produto
+PROXIMO_TRABALHO.md
