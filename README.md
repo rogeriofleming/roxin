@@ -21,6 +21,9 @@ acervo, e mostra **só nome e duração**.
 - **Miniplayer** sobreposto, que aparece quando o Roger sai do Roxin (opcional)
 - **Capa cheia**: clicar na música que toca abre a capa grande, controles graúdos
 - **Curadoria**: tirar, adicionar, criar, renomear, apagar playlist e reordenar arrastando
+  — *tirar* acontece **direto, sem caixa de confirmação** (pedido dele em 25/09/2026): o
+  `.m3u` antigo é copiado para `backup_playlists` a cada reescrita, então a pergunta só
+  atrapalhava. Continua perguntando só para **apagar a playlist inteira**.
 - **Baixar música de um link** — o motor do Anzol embutido (botão "Baixar")
 
 ### Teclado

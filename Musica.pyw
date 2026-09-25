@@ -1932,14 +1932,11 @@ class Player(QMainWindow):
         self.lista_pls.blockSignals(False)
 
     def _tira_da_lista(self, n):
+        """Tira direto, sem perguntar: ele já escolheu no menu, e o .m3u antigo é
+        copiado para `backup_playlists` a cada reescrita (ver `escrever_m3u`).
+        A caixa de confirmação só atrapalhava."""
         nome, itens, arq = self._lista_atual()
         if not arq:
-            return
-        from PySide6.QtWidgets import QMessageBox
-        r = QMessageBox.question(self, "Tirar da playlist",
-                                 "Tirar “%s” de %s?\n\nO arquivo da música não é apagado."
-                                 % (self.faixas[n]["t"], nome))
-        if r != QMessageBox.Yes:
             return
         self._grava_lista(nome, [x for x in itens if x != n])
         self._filtra()
