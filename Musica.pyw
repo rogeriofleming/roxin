@@ -177,7 +177,10 @@ def carregar():
                     soltas.append(add(c))
     if soltas:
         listas.append(("Fora das playlists", soltas))
-    listas.insert(0, ("Todas as músicas", list(range(len(faixas)))))
+    # ordem alfabética, não a ordem de leitura do disco (que sai playlist por
+    # playlist e faz o acervo inteiro se disfarçar da primeira playlist)
+    listas.insert(0, ("Todas as músicas",
+                      sorted(range(len(faixas)), key=lambda n: faixas[n]["b"])))
     return faixas, listas
 
 # ---------------------------------------------------------------- baixar (Anzol)
@@ -894,6 +897,10 @@ class Player(QMainWindow):
         self.faixas, self.listas = carregar()
         self.listas = list(self.listas)
         self.visiveis, self.ordem, self.pos, self.tocando = [], [], -1, -1
+        # a ordem como a lista estava quando ele deu play, e o NOME dessa lista.
+        # sem isto o player nao sabe de onde a musica veio: mostrava no rodape o
+        # nome da lista que esta na TELA, mesmo tocando faixa de outra lista
+        self.ordem_base, self.lista_tocando = [], None
         self.fila = []          # "tocar a seguir": temporaria, morre ao fechar o app
 
         self.setWindowTitle("Roxin")
@@ -1375,7 +1382,8 @@ class Player(QMainWindow):
         n = len(self.faixas) - 1
         for i, (rot, itens) in enumerate(self.listas):
             if rot == "Todas as músicas":
-                self.listas[i] = (rot, list(itens) + [n])
+                self.listas[i] = (rot, sorted(list(itens) + [n],
+                                              key=lambda k: self.faixas[k]["b"]))
         try:
             CP.gerar(quieto=True)          # capinha da faixa nova
         except Exception:
@@ -1547,7 +1555,7 @@ class Player(QMainWindow):
         # de 500px viraria termometro
         self.torre_som.setFixedHeight(min(lado, TORRE_TETO))
         self.nome_palco.setText(f["t"])
-        self.sub_palco.setText(self.listas[self.lista_idx][0])
+        self.sub_palco.setText(self.lista_tocando or self.listas[self.lista_idx][0])
         self.barra_palco.setRange(0, self.mp.duration())
         self.barra_palco.setValue(self.mp.position())
         self.t_total_p.setText(mmss(self.mp.duration() / 1000))
@@ -1760,6 +1768,8 @@ class Player(QMainWindow):
     def _toca_linha(self, lin):
         if lin < 0 or lin >= len(self.visiveis): return
         self.ordem = list(self.visiveis)
+        self.ordem_base = list(self.visiveis)     # para a volta recomeçar limpa
+        self.lista_tocando = self.listas[self.lista_idx][0]
         self.pos = lin
         if self.b_ale.isChecked(): self._embaralha()
         self._toca()
@@ -1776,7 +1786,7 @@ class Player(QMainWindow):
         self.mp.setSource(QUrl.fromLocalFile(f["p"]))
         self.mp.play()
         self.nome_atual.setText(f["t"])
-        self.sub_atual.setText(self.listas[self.lista_idx][0])
+        self.sub_atual.setText(self.lista_tocando or self.listas[self.lista_idx][0])
         self.capa_atual.setPixmap(capa(os.path.basename(f["p"]), CAPA_RODAPE))
         ef = QGraphicsOpacityEffect(self.capa_atual)
         self.capa_atual.setGraphicsEffect(ef)
@@ -1803,8 +1813,25 @@ class Player(QMainWindow):
             self._toca_este(n)
             return
         if not self.ordem: return
-        self.pos = (self.pos + d) % len(self.ordem)
+        n = self.pos + d
+        if 0 <= n < len(self.ordem):
+            self.pos = n
+        else:
+            # deu a volta na lista: ela recomeça do jeito que estava quando ele deu
+            # play. Sem isto, faixa que entrou pela fila ficava na ordem PARA SEMPRE
+            # e voltava a tocar em toda volta da playlist
+            self._recompoe()
+            self.pos = 0 if d > 0 else len(self.ordem) - 1
         self._toca()
+
+    def _recompoe(self):
+        """Volta a ordem ao que a lista era no play. Aleatório: novo embaralhamento
+        a cada volta, em vez de repetir o mesmo sorteio para sempre."""
+        if not self.ordem_base:
+            return
+        self.ordem = list(self.ordem_base)
+        if self.b_ale.isChecked():
+            random.shuffle(self.ordem)
 
     def _toca_este(self, n):
         """Toca a faixa n sem perder a navegacao: ela entra na ordem logo
@@ -1890,8 +1917,9 @@ class Player(QMainWindow):
                 em_lista.update(itens)
         for i, (nome, _itens) in enumerate(self.listas):
             if nome == "Fora das playlists":
-                self.listas[i] = (nome, [n for n in range(len(self.faixas))
-                                         if n not in em_lista])
+                self.listas[i] = (nome, sorted(
+                    (n for n in range(len(self.faixas)) if n not in em_lista),
+                    key=lambda n: self.faixas[n]["b"]))
                 return
 
     def _rotulos_playlists(self):
@@ -1997,6 +2025,8 @@ class Player(QMainWindow):
             ARQUIVO_DA_LISTA.pop(nome, None)
             ARQUIVO_DA_LISTA[novo] = destino
             self.listas[i] = (novo, self.listas[i][1])
+            if self.lista_tocando == nome:      # o rodapé não pode ficar com o nome velho
+                self.lista_tocando = novo
             self._rotulos_playlists()
             self._filtra()
         elif esc == a_apaga:

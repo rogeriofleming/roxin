@@ -14,6 +14,7 @@ acervo, e mostra **só nome e duração**.
 - Toca **mp3 e m4a** (AAC) usando os codecs do próprio Windows, via QtMultimedia
 - Busca que **ignora acento** — "coracao" encontra *Coração de Aço*
 - Aleatório, repetir, barra de progresso clicável, volume
+- A playlist **dá a volta nela mesma**: acabou a última, volta para a primeira
 - Junta numa lista "Fora das playlists" o que não está em playlist nenhuma
 - **Capinha quadrada** ao lado de cada música e no canto do player (ver abaixo)
 - **Fila** ("tocar a seguir"): painel à direita, montado por clique direito
@@ -57,7 +58,33 @@ direito dentro dela dá *Tocar agora*, *Subir para o topo* e *Tirar da fila*.
 O avanço passa pela fila em **todos** os caminhos, porque tanto o botão "próxima"
 quanto o fim da música chamam `_pula(1)` — é lá que a fila é consultada. A faixa que
 sai da fila entra na `ordem` logo depois da atual, então "anterior" continua fazendo
-sentido depois dela.
+sentido depois dela — mas **só até a lista dar a volta**: ao completar o ciclo a
+`ordem` é recomposta a partir de `ordem_base`, senão a faixa enfileirada uma vez
+viraria moradora da playlist e voltaria a tocar em toda volta.
+
+## O que está tocando × o que está na tela (conserto de 25/09/2026)
+
+O Roger relatou: *"toquei a última música da playlist e ele começou a rodar música de
+fora"*. Era verdade, por **dois** caminhos — e nenhum deles era o loop, que sempre
+deu a volta certa:
+
+1. **`"Todas as músicas"` vinha na ordem de leitura do disco** — isto é, playlist por
+   playlist. No acervo dele as 83 primeiras faixas dessa lista *eram* a playlist
+   `Brasil`, na mesma ordem. Como é a lista que o Roxin abre por padrão, dar play nela
+   era indistinguível de tocar a `Brasil`… até a 84ª faixa, quando entrava
+   `ABRETE CORAZON`, da `Cerimonia`. Agora as duas listas virtuais saem em **ordem
+   alfabética**, e o acervo não se disfarça mais de playlist.
+2. **O rodapé mostrava o nome da lista que estava NA TELA**, não a de onde a faixa
+   tocando veio (`self.listas[self.lista_idx][0]`). Tocando do acervo e clicando numa
+   playlist só para olhar, o rodapé passava a dizer o nome dela — a mentira que fecha
+   a impressão de "saí da playlist". Agora existe `self.lista_tocando`, gravado no
+   play, e é ele que o rodapé e o palco mostram.
+
+O que **não** era defeito: `_pula(1)` sempre deu a volta na `ordem`. O que faltava era
+o player saber **de qual lista** a música que toca veio — não havia esse conceito.
+
+Regressão: `python testes/teste_loop_playlist.py` (10 asserções, offscreen, com
+acervo falso e o sinal `EndOfMedia` simulado na mão).
 
 ## Miniplayer sobreposto
 
