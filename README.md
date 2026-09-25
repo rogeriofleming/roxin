@@ -233,6 +233,68 @@ diferentes:
 Se um dia as duas tiverem de virar uma só, a pergunta é a mesma: vale mais o alinhamento
 da grade ou a integridade de cada arte? Hoje a resposta é diferente para cada origem.
 
+### Capa do acervo antigo — o id estava nas TAGS (25/09/2026)
+
+A seção acima cobre o que o **Anzol** baixa hoje: o id vem no nome do arquivo
+(`[<id>].mp3`). O acervo antigo do Roger — baixado entre ~2015 e ~2018 por conversores
+de site, e depois carregado de celular para dois notebooks e dois HDs — não tem id no
+nome. Mas guardou a URL da miniatura **dentro da tag ID3**:
+
+```
+WXXX:MP3-META Front Cover URL = https://i1.ytimg.com/vi/<id>/default.jpg
+WXXX:M3P-META Referrer URL    = https://youtu.be/<id>
+```
+
+Daí saem **262 IDs de vídeo**, e com eles a miniatura em alta. Importa porque o que o
+conversor **embutiu** no arquivo é a miniatura pequena — tipicamente **400×225**, 16:9,
+com tarja preta — enquanto o YouTube ainda serve `maxresdefault` (**1280×720**) para o
+mesmo vídeo. Medido antes da correção: **487 das 744 capas do cache estavam abaixo de
+512 px**, quase todas em 400.
+
+```
+python capas.py --acervo-antigo           # melhora o que dá
+python capas.py --acervo-antigo --listar  # só conta quantas têm id, não baixa nada
+```
+
+Duas travas, as duas pagas com erro visto na tela:
+
+⚠️ **1. Só troca se a nova for MAIOR** (`melhorar_capa` devolve `(trocou, velho, novo)`).
+Quando o vídeo não tem `maxresdefault`, cai-se em `mqdefault` (320×180), que é *menor*
+que a imagem de 400×225 já embutida — trocar ali **pioraria** a capa. Visto funcionando
+na amostra (`400 -> 180` ficou como estava).
+
+⚠️ **2. Quem já tinha capa não tem o ENQUADRAMENTO mexido** — entra por `encaixado()`,
+não por `quadrado()`. A primeira versão disto cortava o centro, como manda a regra de
+24/09 para capa buscada na web, e o resultado decepou o texto que quase toda capa de
+lyric video tem: *"You Are Loved"* virou *"ou Are Love"*, *"LALALA"* virou *"ALAL"*.
+Ganhava-se nitidez e perdia-se a informação — troca ruim. Hoje só quem **não tinha capa
+nenhuma** recebe o corte quadrado; quem já tinha só ganha resolução, no mesmo
+enquadramento de antes.
+
+Medido: das capas do cache, **218 eram quadradas e nenhuma foi tocada** — o que muda são
+as 16:9 e 4:3, que vieram de vídeo mesmo. Antes de cada rodada o cache inteiro é copiado
+para `%LOCALAPPDATA%\Roxin\capas_backup_<data>`.
+
+Resultado da primeira rodada, em 25/09/2026: **80 capas novas** (faixas que não tinham
+nenhuma) e **365 com mais resolução**, quase todas de 400 → 512 px.
+
+⚠️ **O custo, medido e não estimado:** em **50** dessas 365 a *cena* mudou, não só a
+resolução — o canal trocou a thumbnail do vídeo depois que o Roger baixou, então a capa
+que ele via era a de 2016 e o YouTube serve a de hoje. Conferido a olho numa amostra: na
+maioria a nova é melhor (arte oficial no lugar de um frame qualquer do clipe), mas nem
+sempre — em *See You Again* a antiga, o carro no pôr do sol, é mais icônica, e essa foi
+revertida. A lista completa está em [`capas_cena_trocada.md`](capas_cena_trocada.md), e
+nada disso é definitivo:
+
+```
+python capas.py --restaurar "pedaço do nome"   # volta uma
+python capas.py --restaurar                    # volta todas
+```
+
+A arqueologia completa desse acervo — inclusive o canal de onde a coleção de eletrônica
+dele veio, o **1DoBrasil**, cujo nome sobreviveu dentro de dois arquivos — está em
+`D:\Claude Code\Claude Mestre v2\estudosdobrasil\`.
+
 ### Capa que não está no arquivo
 
 `buscar_capas.py` procura o que falta na busca pública da Apple (sem chave, só
