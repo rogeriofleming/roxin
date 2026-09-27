@@ -438,12 +438,53 @@ class _TelaCasaState extends State<TelaCasa> {
       );
 
   Future<void> _importar() async {
-    // file_picker 13: pickFile() e estatico e devolve PlatformFile? direto
-    // (a 11.x usava FilePicker.platform.pickFiles e um FilePickerResult).
-    final escolhido = await FilePicker.pickFile();
-    final caminho = escolhido?.path;
-    if (caminho == null) return;
-    if (!caminho.toLowerCase().endsWith('.zip')) {
+    // Antes de abrir o seletor: o pacote ja esta na pasta do app? No iPhone esse
+    // e o caminho natural (Drive -> Salvar em Arquivos -> No meu iPhone ->
+    // Roxin), e achar sozinho poupa o Roger de caçar arquivo no seletor.
+    final aqui = await pacotesLargadosAqui();
+    String? caminho;
+    if (aqui.isNotEmpty && mounted) {
+      caminho = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: Cores.painel,
+          title: const Text('Achei um pacote aqui',
+              style: TextStyle(color: Cores.pena, fontFamily: familiaSerifa)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final f in aqui.take(5))
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.inventory_2_outlined,
+                      color: Cores.roxo),
+                  title: Text(f.uri.pathSegments.last,
+                      style: const TextStyle(
+                          color: Cores.pena, fontSize: 13.5)),
+                  onTap: () => Navigator.pop(context, f.path),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, ''),
+              child: const Text('procurar outro'),
+            ),
+          ],
+        ),
+      );
+      if (caminho == null) return; // fechou o diálogo: não faz nada
+    }
+    if (caminho == null || caminho.isEmpty) {
+      // file_picker 13: pickFile() e estatico e devolve PlatformFile? direto
+      // (a 11.x usava FilePicker.platform.pickFiles e um FilePickerResult).
+      final escolhido = await FilePicker.pickFile();
+      caminho = escolhido?.path;
+    }
+    if (caminho == null || caminho.isEmpty) return;   // desistiu de escolher
+    final alvo = caminho;                             // daqui pra frente nao e nulo
+    if (!alvo.toLowerCase().endsWith('.zip')) {
       _recado('Isso não é um pacote .zip do Roxin');
       return;
     }
@@ -451,7 +492,7 @@ class _TelaCasaState extends State<TelaCasa> {
     final rel = await showDialog<Relatorio>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _DialogoImportando(caminho: caminho),
+      builder: (_) => _DialogoImportando(caminho: alvo),
     );
     if (rel == null) return;
     await motor.recarregar();

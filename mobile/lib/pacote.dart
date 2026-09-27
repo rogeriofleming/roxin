@@ -274,6 +274,28 @@ Future<void> _escrever(String caminho, List<int> bytes) async {
   await f.writeAsBytes(bytes, flush: false);
 }
 
+/// Pacotes .zip largados DENTRO da pasta do app.
+///
+/// Existe por causa do iPhone: la nao ha pasta "Download" compartilhada como no
+/// Android. O caminho natural e o app Arquivos -- no Drive, "Salvar em
+/// Arquivos" -> "No meu iPhone" -> Roxin. Com UIFileSharingEnabled ligado no
+/// Info.plist, essa pasta e esta aqui embaixo, e o app acha o pacote sozinho,
+/// sem o Roger ter que caçar arquivo no seletor.
+Future<List<File>> pacotesLargadosAqui() async {
+  try {
+    final docs = await getApplicationDocumentsDirectory();
+    if (!await docs.exists()) return const [];
+    final achados = <File>[];
+    await for (final e in docs.list()) {
+      if (e is File && e.path.toLowerCase().endsWith('.zip')) achados.add(e);
+    }
+    achados.sort((a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+    return achados;
+  } catch (_) {
+    return const [];
+  }
+}
+
 Future<bool> apagarPacote(String nome) async {
   final raiz = await Biblioteca.pastaAcervo();
   final d = Directory(p.join(raiz.path, nome));

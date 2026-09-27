@@ -1,0 +1,89 @@
+# Compila o Roxin para iPhone num Mac do GitHub — de graça.
+#
+# POR QUE ISTO EXISTE
+# -------------------
+# Compilar para iOS exige macOS e Xcode, e o Roger usa Windows. O repositório do
+# Roxin é PÚBLICO, e para repositório público o GitHub dá runner macOS sem cobrar.
+# Então o Mac é emprestado aqui, e o resultado é um .ipa que ele instala no
+# iPhone com a conta Apple GRÁTIS dele — sem os US$ 99/ano.
+#
+# O .ipa sai SEM ASSINATURA de propósito (`--no-codesign`). Quem assina é o
+# AltStore/SideStore/Sideloadly na máquina dele, com o Apple ID comum. Assinar
+# aqui exigiria certificado de desenvolvedor, que é justamente o que custa.
+#
+# ⚠️ O QUE ISTO NÃO RESOLVE: app assinado com conta grátis PARA DE ABRIR em 7
+# dias. Isso é regra da Apple, não falha do build. O jeito de conviver está em
+# IPHONE.md, na raiz do repositório.
+
+name: iPhone (.ipa sem assinatura, para sideload)
+
+on:
+  workflow_dispatch: # roda quando alguém manda rodar
+  push:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/ios.yml"
+
+jobs:
+  ipa:
+    name: Build iOS
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Pegar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar o Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Conferir o Flutter
+        run: flutter --version
+
+      - name: Dependências
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Analisador (não deixa passar código quebrado)
+        working-directory: mobile
+        run: flutter analyze
+
+      - name: Testes de motor
+        working-directory: mobile
+        run: flutter test
+
+      - name: Build iOS sem assinatura
+        working-directory: mobile
+        run: flutter build ios --release --no-codesign
+
+      - name: Empacotar em .ipa
+        working-directory: mobile/build/ios/iphoneos
+        run: |
+          mkdir -p Payload
+          cp -R Runner.app Payload/
+          zip -qry Roxin.ipa Payload
+          ls -lh Roxin.ipa
+
+      - name: Conferir que o .ipa tem o que precisa
+        working-directory: mobile/build/ios/iphoneos
+        run: |
+          set -e
+          PLIST=Payload/Runner.app/Info.plist
+          echo "--- checando as chaves que fazem o app funcionar ---"
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :UIFileSharingEnabled" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :LSSupportsOpeningDocumentsInPlace" "$PLIST"
+          # som em segundo plano é o requisito nº 1: se sumir, o build falha aqui
+          /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST" | grep -q audio
+          echo "OK: audio em segundo plano, pasta no app Arquivos"
+
+      - name: Guardar o .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: Roxin-iphone-ipa
+          path: mobile/build/ios/iphoneos/Roxin.ipa
+          retention-days: 90
+          if-no-files-found: error
