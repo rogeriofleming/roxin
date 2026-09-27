@@ -1,0 +1,18 @@
+{
+  "name": "Roxin",
+  "short_name": "Roxin",
+  "description": "O player de musica do Roger. Toca o acervo offline, sem internet e sem o PC ligado.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0c16",
+  "theme_color": "#0f0c16",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "icone-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

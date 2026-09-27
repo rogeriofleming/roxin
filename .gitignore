@@ -62,3 +62,6 @@ Roxin-android.apk
 
 # o .ipa gerado no Mac do GitHub (baixe em Actions > artifacts)
 Roxin-iphone.ipa
+
+# fotos que eu gero ao conferir a PWA
+pwa/node_modules/

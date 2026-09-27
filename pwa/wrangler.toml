@@ -1,0 +1,20 @@
+name = "roxin"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# A PWA inteira e estatica: o Worker so serve os arquivos. Nao ha banco, nao ha
+# login, nao ha nada do Roger no servidor -- as musicas nunca saem do celular.
+[assets]
+directory = "publico"
+binding = "ARQUIVOS"
+not_found_handling = "single-page-application"
+# Sem isto o Cloudflare serve os arquivos ANTES do Worker, e nenhum cabecalho
+# meu chega ao navegador -- conferido com curl em 27/09/2026: o CSP e o tipo do
+# manifest simplesmente nao apareciam.
+run_worker_first = true
+
+# O endereco de verdade. workers.dev e "subdominio fajuto" pela regra da casa:
+# todo app do Roger mora em <app>.rogeriofleming.com.br
+[[routes]]
+pattern = "roxin.rogeriofleming.com.br"
+custom_domain = true
