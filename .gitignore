@@ -56,3 +56,6 @@ PROXIMO_TRABALHO.md
 
 # pacotes gerados pro celular: arquivo grande, nao vai pro git
 pacotes/
+
+# o APK gerado: 55 MB, nao vai pro git (build com 'flutter build apk --release')
+Roxin-android.apk

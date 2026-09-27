@@ -31,9 +31,20 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+
+            // Minificacao DESLIGADA, e o motivo e medido, nao por precaucao:
+            // com R8 ligado o audio_service quebrava com
+            //   IllegalArgumentException: You must specify an icon resource id
+            //   to build a CustomAction
+            // porque o encolhedor removia os drawables dos controles de midia.
+            // Resultado pratico: a sessao ficava active=false, NAO aparecia
+            // controle na tela de bloqueio, e o som nao tinha como sobreviver a
+            // tela apagada -- que e a razao de o app existir.
+            // Custo declarado: o APK fica maior (medir no build). Preferivel a
+            // um player que morre no bolso.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

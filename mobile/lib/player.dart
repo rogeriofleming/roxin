@@ -13,6 +13,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+// MediaItem vem daqui: e o que descreve a faixa para a tela de bloqueio
+import 'package:just_audio_background/just_audio_background.dart';
 
 import 'pacote.dart';
 
@@ -60,18 +62,16 @@ class Motor extends ChangeNotifier {
     if (n < 0 || n >= lista.faixas.length) return;
     _ordem = List<int>.from(lista.faixas);
     listaTocando = lista.nome;
-    await _som.setAudioSource(_fonte(_ordem), initialIndex: n);
+    await _som.setAudioSources(_fontes(_ordem), initialIndex: n);
     _posicao = n;
     await _som.play();
     notifyListeners();
   }
 
-  ConcatenatingAudioSource _fonte(List<int> indices) =>
-      ConcatenatingAudioSource(
-        children: [
-          for (final i in indices) _item(biblioteca.faixas[i]),
-        ],
-      );
+  // just_audio 0.10 aposentou o ConcatenatingAudioSource: agora a fila e uma
+  // lista simples entregue ao player por setAudioSources.
+  List<AudioSource> _fontes(List<int> indices) =>
+      [for (final i in indices) _item(biblioteca.faixas[i])];
 
   AudioSource _item(Faixa f) => AudioSource.file(
         f.caminho,
@@ -88,9 +88,8 @@ class Motor extends ChangeNotifier {
   Future<void> aSeguir(Faixa f) async {
     final idx = biblioteca.faixas.indexOf(f);
     if (idx < 0) return;
-    final fonte = _som.audioSource;
-    if (fonte is ConcatenatingAudioSource && _posicao >= 0) {
-      await fonte.insert(_posicao + 1, _item(f));
+    if (_posicao >= 0 && _som.sequence.isNotEmpty) {
+      await _som.insertAudioSource(_posicao + 1, _item(f));
       notifyListeners();
     } else {
       await tocarFaixa(f);
@@ -101,7 +100,7 @@ class Motor extends ChangeNotifier {
     final n = faixasDaTela.indexOf(f);
     if (n >= 0) return tocarDaTela(n);
     _ordem = [biblioteca.faixas.indexOf(f)];
-    await _som.setAudioSource(_fonte(_ordem));
+    await _som.setAudioSources(_fontes(_ordem));
     _posicao = 0;
     await _som.play();
     notifyListeners();

@@ -108,7 +108,7 @@ class Biblioteca {
         if (idx.isNotEmpty) listas.add(Playlist(nome, idx));
       }
       final quando = DateTime.tryParse((ind['gerado'] as String?) ?? '');
-      if (quando != null && (maisNovo == null || quando.isAfter(maisNovo!))) {
+      if (quando != null && (maisNovo == null || quando.isAfter(maisNovo))) {
         maisNovo = quando;
       }
     }

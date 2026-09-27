@@ -11,14 +11,18 @@ dependencies:
     sdk: flutter
   # tocar + sessao de midia do sistema (tela de bloqueio, fone, carro).
   # sem a segunda, o Android mata o app quando a tela apaga.
-  just_audio: ^0.9.40
-  just_audio_background: ^0.0.1-beta.13
+  just_audio: ^0.10.6
+  just_audio_background: ^0.0.1-beta.17
   # abrir o .zip que o Drive deixou em Download/
   archive: ^3.6.1
   crypto: ^3.0.3
-  file_picker: ^8.1.2
+  # 13.x compila contra o SDK 36; a 8.x ainda declarava 34 e travava o build
+  file_picker: ^13.1.0
   path: ^1.9.0
   path_provider: ^2.1.4
+  # pedir POST_NOTIFICATIONS no Android 13+: sem a permissao nao ha notificacao
+  # de midia, e sem ela nao ha controle na tela de bloqueio (medido em 27/09/2026)
+  permission_handler: ^11.3.1
 
 dev_dependencies:
   flutter_test:

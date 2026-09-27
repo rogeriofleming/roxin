@@ -8,8 +8,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'marca.dart';
 import 'pacote.dart';
@@ -25,6 +25,12 @@ Future<void> main() async {
     androidNotificationOngoing: true,
     androidStopForegroundOnPause: false,
   );
+  // No Android 13+ a permissao de notificacao e pedida em tempo de execucao.
+  // Medido em 27/09/2026 num aparelho virtual: sem ela o app fica com
+  // importance=NONE, NAO existe notificacao de midia -- e sem notificacao de
+  // midia nao ha controle na tela de bloqueio, que e o motivo de o app existir.
+  // Declarar no AndroidManifest nao basta; tem que PEDIR.
+  await Permission.notification.request();
   runApp(const RoxinApp());
 }
 
@@ -432,11 +438,10 @@ class _TelaCasaState extends State<TelaCasa> {
       );
 
   Future<void> _importar() async {
-    final r = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-      withData: false,
-    );
-    final caminho = r?.files.single.path;
+    // file_picker 13: pickFile() e estatico e devolve PlatformFile? direto
+    // (a 11.x usava FilePicker.platform.pickFiles e um FilePickerResult).
+    final escolhido = await FilePicker.pickFile();
+    final caminho = escolhido?.path;
     if (caminho == null) return;
     if (!caminho.toLowerCase().endsWith('.zip')) {
       _recado('Isso não é um pacote .zip do Roxin');
@@ -500,10 +505,12 @@ class _DialogoImportandoState extends State<_DialogoImportando> {
 
   Future<void> _correr() async {
     final rel = await importarPacote(widget.caminho, progresso: (f, t) {
-      if (mounted) setState(() {
-        feitas = f;
-        total = t;
-      });
+      if (mounted) {
+        setState(() {
+          feitas = f;
+          total = t;
+        });
+      }
     });
     if (mounted) Navigator.pop(context, rel);
   }
