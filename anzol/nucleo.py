@@ -121,6 +121,10 @@ def formatar_duracao(segundos: float | None) -> str:
 _TRADUCOES: tuple[tuple[str, str], ...] = (
     ("private video", "Vídeo privado — só quem tem convite do canal consegue baixar."),
     ("members-only", "Vídeo exclusivo para membros do canal."),
+    # "This video is only available to Music Premium members": os album do
+    # YouTube Music (list=OLAK5uy_...) sao art tracks, nao video publico
+    ("music premium",
+     "Faixa de álbum do YouTube Music: só toca para quem assina o Music Premium."),
     ("sign in to confirm your age", "Vídeo com restrição de idade: o site exige login."),
     ("sign in to confirm", "O site pediu login para liberar este vídeo."),
     ("confirm you're not a bot", "O site pediu confirmação de que você não é um robô."),
@@ -161,6 +165,46 @@ def traduzir_erro(bruto: str) -> str:
         if agulha in baixo:
             return frase
     return texto or "Falhou sem dizer por quê."
+
+
+class _ColetorDeErros:
+    """Guarda o que o yt-dlp so conta ao logger.
+
+    Com `ignoreerrors` ligado -- que e o caso de toda playlist -- o item que
+    falha nao levanta excecao nenhuma: a mensagem sai pelo logger e morre ali.
+    Sem isto, uma playlist inteira que falhou vira "nenhum arquivo ficou pronto"
+    sem dizer por que. Foi o que aconteceu em 27/09/2026 com um album do
+    YouTube Music, cujas faixas exigem assinatura Premium: o Roxin disse que
+    todos falharam, e o motivo real nao aparecia em lugar nenhum.
+    """
+
+    def __init__(self) -> None:
+        self.erros: list[str] = []
+
+    # o yt-dlp exige os quatro metodos; so o error() interessa aqui
+    def debug(self, msg: str) -> None:
+        pass
+
+    def info(self, msg: str) -> None:
+        pass
+
+    def warning(self, msg: str) -> None:
+        pass
+
+    def error(self, msg: str) -> None:
+        texto = str(msg or "").strip()
+        if texto:
+            self.erros.append(texto)
+
+    def motivo(self) -> str:
+        """A causa que mais se repetiu, ja em portugues. Vazio se nao houve erro."""
+        if not self.erros:
+            return ""
+        contagem: dict[str, int] = {}
+        for bruto in self.erros:
+            frase = traduzir_erro(bruto)
+            contagem[frase] = contagem.get(frase, 0) + 1
+        return max(contagem.items(), key=lambda kv: kv[1])[0]
 
 
 def arquivos_finais(info: dict) -> list[str]:
@@ -425,7 +469,10 @@ def rodar_download(
     pasta = pasta or DOWNLOADS_DIR
     pasta.mkdir(parents=True, exist_ok=True)
     try:
-        with yt_dlp.YoutubeDL(_opcoes(job_id, modo, playlist, pasta)) as ydl:
+        coletor = _ColetorDeErros()
+        opcoes = _opcoes(job_id, modo, playlist, pasta)
+        opcoes["logger"] = coletor      # senao o motivo de cada item se perde
+        with yt_dlp.YoutubeDL(opcoes) as ydl:
             info = ydl.extract_info(url, download=True)
 
         entregues = [Path(p) for p in arquivos_finais(info or {})]
@@ -433,11 +480,13 @@ def rodar_download(
         _varrer_sobras(pasta, job_id, {p.name for p in existentes})
 
         if not existentes:
+            recado = ("O download terminou mas nenhum arquivo ficou pronto. "
+                      "Numa playlist, isso quer dizer que todos os itens falharam.")
+            motivo = coletor.motivo()
             _atualizar(
                 job_id,
                 status="erro",
-                erro="O download terminou mas nenhum arquivo ficou pronto. "
-                     "Numa playlist, isso quer dizer que todos os itens falharam.",
+                erro=f"{recado} Motivo: {motivo}" if motivo else recado,
                 terminou_em=_agora(),
             )
             return

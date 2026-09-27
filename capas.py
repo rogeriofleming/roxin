@@ -29,6 +29,39 @@ def chave(nome_arquivo):
     return h + ".png"
 
 
+def arquivo_sem_capa():
+    """Registro de quem JA foi verificado e nao tem imagem embutida."""
+    return os.path.join(os.path.dirname(pasta_cache()), "sem_capa.json")
+
+
+def _ler_sem_capa():
+    try:
+        import json
+        with io.open(arquivo_sem_capa(), encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+
+def _gravar_sem_capa(d):
+    try:
+        import json
+        with io.open(arquivo_sem_capa(), "w", encoding="utf-8") as f:
+            json.dump(d, f)
+    except Exception:
+        pass          # e so cache: falhar aqui nao pode quebrar o app
+
+
+def _carimbo(caminho):
+    """mtime+tamanho: se o arquivo mudar, vale reverificar."""
+    try:
+        s = os.stat(caminho)
+        return "%d:%d" % (int(s.st_mtime), s.st_size)
+    except OSError:
+        return ""
+
+
 def quantas_no_cache():
     """Quantas miniaturas ja existem. Zero = maquina nova, precisa gerar."""
     try:
@@ -68,17 +101,33 @@ def gerar(forcar=False, quieto=False):
 
     cache = pasta_cache()
     com = sem = erro = pulou = 0
+    # quem ja foi verificado e nao tem imagem embutida nao precisa ser relido
+    registro = {} if forcar else _ler_sem_capa()
+    mexeu = False
     for nome in sorted(os.listdir(MUSICA)):
         if os.path.splitext(nome)[1].lower() not in (".mp3", ".m4a"):
             continue
         destino = os.path.join(cache, chave(nome))
         if os.path.exists(destino) and not forcar:
+            if nome.lower() in registro:
+                registro.pop(nome.lower(), None)   # ganhou capa: sai do registro
+                mexeu = True
             pulou += 1; com += 1
             continue
-        dados = imagem_embutida(os.path.join(MUSICA, nome))
+        caminho = os.path.join(MUSICA, nome)
+        marca = registro.get(nome.lower())
+        if marca and marca == _carimbo(caminho):
+            sem += 1          # sem capa, e ja sabiamos: nao abre o arquivo
+            continue
+        dados = imagem_embutida(caminho)
         if not dados:
+            registro[nome.lower()] = _carimbo(caminho)
+            mexeu = True
             sem += 1
             continue
+        if nome.lower() in registro:
+            registro.pop(nome.lower(), None)   # ganhou capa: sai do registro
+            mexeu = True
         img = QImage()
         if not img.loadFromData(dados):
             erro += 1
@@ -92,6 +141,8 @@ def gerar(forcar=False, quieto=False):
             com += 1
         else:
             erro += 1
+    if mexeu:
+        _gravar_sem_capa(registro)
     if not quieto:
         print("cache: %s" % cache)
         print("com capa: %d (%d ja estavam)  |  sem capa: %d  |  ilegiveis: %d"

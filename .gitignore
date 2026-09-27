@@ -50,3 +50,6 @@ capas_cena_trocada.md
 
 # notas internas de sessao, nao sao documentacao do produto
 PROXIMO_TRABALHO.md
+
+# backups locais de patch (nao versionar)
+*.bak_*

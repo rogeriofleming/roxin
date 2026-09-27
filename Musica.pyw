@@ -926,6 +926,9 @@ class Player(QMainWindow):
         self._pinta_fila()
 
         self._ajustes = ler_ajustes()
+        # teto do cache de miniaturas: sem isto fica no default do Qt, sem controle.
+        # 24 MB cobre a tela cheia de capinhas com folga e nao cresce sozinho.
+        QPixmapCache.setCacheLimit(24 * 1024)
         self.mini = None          # nasce na primeira vez que for preciso
         self.b_mini.setChecked(bool(self._ajustes.get("mini", False)))
 
@@ -1663,13 +1666,21 @@ class Player(QMainWindow):
         CSS aprovado); sem QtWebEngine na maquina, cai no pintado a mao."""
         if self.mini is not None:
             return self.mini
-        try:
-            from mini_vidro import MiniVidro
-            self.mini = MiniVidro(self)
-            self._tipo_mini = "vidro (HTML + filtro da skill)"
-        except Exception as e:
+        # O vidro custa caro: medido em 27/09/2026, o QWebEngineView sobe um
+        # Chromium e o app vai de 68 MB para 191 MB -- 123 MB so no miniplayer.
+        # Quem quiser o app leve poe "mini_vidro": false no ajustes.json e fica
+        # com o pintado a mao, que nao usa navegador nenhum.
+        if not self._ajustes.get("mini_vidro", True):
             self.mini = Mini(self)
-            self._tipo_mini = "pintado a mao (sem QtWebEngine: %s)" % e
+            self._tipo_mini = "pintado a mao (por escolha: mini_vidro=false)"
+        else:
+            try:
+                from mini_vidro import MiniVidro
+                self.mini = MiniVidro(self)
+                self._tipo_mini = "vidro (HTML + filtro da skill)"
+            except Exception as e:
+                self.mini = Mini(self)
+                self._tipo_mini = "pintado a mao (sem QtWebEngine: %s)" % e
         # `mini_lugar_vidro` e o canto do VIDRO que se ve, nao o da janela (que tem
         # margem transparente em volta). A chave velha `mini_lugar` guardava o canto
         # da janela e por isso e ignorada: com a margem nova ela poria o vidro fora
