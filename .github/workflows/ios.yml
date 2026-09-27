@@ -63,6 +63,20 @@ jobs:
         working-directory: mobile
         run: flutter build ios --release --no-codesign
 
+      # Quem REALMENTE foi registrado esta aqui. Em 27/09/2026 o lado Dart do
+      # path_provider estava no app e o lado NATIVO nao -- o que daria
+      # MissingPluginException na primeira coisa que o Roxin faz (achar a pasta
+      # da biblioteca). Este passo mostra o fato em vez de me deixar teorizar.
+      - name: Quais plugins o Flutter registrou
+        working-directory: mobile
+        run: |
+          echo "--- GeneratedPluginRegistrant ---"
+          find ios -name "GeneratedPluginRegistrant*" -print -exec cat {} \; | head -60
+          echo "--- plugins iOS em .flutter-plugins-dependencies ---"
+          python3 -c "import json;d=json.load(open('.flutter-plugins-dependencies'));[print('  ',p['name'],'->',p.get('path','')[:60]) for p in d['plugins']['ios']]"
+          echo "--- pacotes Swift gerados ---"
+          find ios -name "Package.swift" -print -exec cat {} \; | head -40
+
       - name: Empacotar em .ipa
         working-directory: mobile/build/ios/iphoneos
         run: |
