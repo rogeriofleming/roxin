@@ -55,6 +55,16 @@ jobs:
         working-directory: mobile
         run: flutter test
 
+      # ⚠️ Passo pago com erro em 27/09/2026: sem o pod install os plugins
+      # nativos NAO entram no app, e o build passa verde do mesmo jeito --
+      # entregando um Roxin que abre e nao toca. O Podfile agora e versionado.
+      - name: CocoaPods (integrar os plugins nativos)
+        working-directory: mobile/ios
+        run: |
+          pod install --repo-update
+          echo "--- pods instalados ---"
+          grep -E "^\s+- " Podfile.lock | head -20
+
       - name: Build iOS sem assinatura
         working-directory: mobile
         run: flutter build ios --release --no-codesign
@@ -79,6 +89,23 @@ jobs:
           # som em segundo plano é o requisito nº 1: se sumir, o build falha aqui
           /usr/libexec/PlistBuddy -c "Print :UIBackgroundModes" "$PLIST" | grep -q audio
           echo "OK: audio em segundo plano, pasta no app Arquivos"
+
+          echo "--- os plugins nativos entraram mesmo? ---"
+          # Em 27/09/2026 um .ipa saiu SEM NENHUM plugin e o build ficou verde.
+          # Agora cada peca essencial e cobrada pelo nome: faltou, o build quebra.
+          FALTOU=0
+          for P in just_audio audio_service audio_session file_picker_darwin path_provider_foundation permission_handler_apple; do
+            if ls -d Payload/Runner.app/Frameworks/${P}.framework >/dev/null 2>&1; then
+              echo "  OK    $P"
+            else
+              echo "  FALTA $P"
+              FALTOU=1
+            fi
+          done
+          if [ "$FALTOU" = "1" ]; then
+            echo "::error::plugin nativo faltando no .ipa -- o app abriria sem som. Ver o passo do CocoaPods."
+            exit 1
+          fi
 
       - name: Guardar o .ipa
         uses: actions/upload-artifact@v4
