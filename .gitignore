@@ -59,3 +59,6 @@ pacotes/
 
 # o APK gerado: 55 MB, nao vai pro git (build com 'flutter build apk --release')
 Roxin-android.apk
+
+# o .ipa gerado no Mac do GitHub (baixe em Actions > artifacts)
+Roxin-iphone.ipa
