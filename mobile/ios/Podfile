@@ -11,7 +11,11 @@
 # O `flutter build` só gera o Podfile em máquina interativa; no runner de CI ele
 # seguiu direto. Versionar resolve de vez.
 
-platform :ios, '13.0'   # audio_service e permission_handler exigem 13+
+# 15.0 nao e chute: e o IPHONEOS_DEPLOYMENT_TARGET que o proprio Runner.xcodeproj
+# do Flutter 3.47 usa. Com 13.0 o CocoaPods recusa o pod Flutter dizendo
+# "required a higher minimum deployment target" (pago em 27/09/2026).
+# Custo declarado: exige iPhone com iOS 15+ (iPhone 6s em diante).
+platform :ios, '15.0'
 
 # Não manda estatística de uso para o CocoaPods
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -52,7 +56,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       # permission_handler liga as permissões por macro: sem isto ele compila
       # tudo e pede coisas que o Roxin não usa (câmera, contatos, localização).
       # O Roxin só precisa de NOTIFICAÇÃO.
