@@ -107,7 +107,12 @@ jobs:
           # serve: em 27/09/2026 procurei "AudioPlayer" e casei com simbolo do
           # proprio iOS, o que me fez comemorar um .ipa que estava vazio.
           FALTOU=0
-          for S in JustAudioPlugin AudioServicePlugin FilePickerPlugin PathProviderPlugin PermissionHandlerPlugin; do
+          # PathProviderPlugin NAO entra nesta lista, e o motivo importa: o
+          # path_provider_foundation tem native_build=false -- ele nao e plugin
+          # nativo, chama as APIs do iOS por FFI atraves do objective_c.framework.
+          # Cobrar a classe dele foi o que me fez gritar defeito onde nao havia,
+          # em 27/09/2026, e me custou uma volta inteira pelo CocoaPods.
+          for S in JustAudioPlugin AudioServicePlugin AudioSessionPlugin FilePickerPlugin PermissionHandlerPlugin; do
             if strings -a Payload/Runner.app/Runner | grep -qx "$S"; then
               echo "  OK    $S"
             else
@@ -119,6 +124,15 @@ jobs:
             echo "::error::plugin nativo faltando -- o app abriria sem som. Ver o log do build."
             exit 1
           fi
+          # o path_provider anda por aqui: sem este framework, achar a pasta da
+          # biblioteca falha no celular
+          if [ -d Payload/Runner.app/Frameworks/objective_c.framework ]; then
+            echo "  OK    objective_c.framework (e por ele que o path_provider funciona)"
+          else
+            echo "::error::objective_c.framework faltando -- o path_provider nao teria como achar a pasta da biblioteca."
+            exit 1
+          fi
+
           echo "--- tamanho do binario (com os plugins dentro) ---"
           ls -lh Payload/Runner.app/Runner
 
