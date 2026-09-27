@@ -1,0 +1,29 @@
+name: roxin
+description: Roxin — o player de música do Roger, no celular. Toca o acervo offline.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # tocar + sessao de midia do sistema (tela de bloqueio, fone, carro).
+  # sem a segunda, o Android mata o app quando a tela apaga.
+  just_audio: ^0.9.40
+  just_audio_background: ^0.0.1-beta.13
+  # abrir o .zip que o Drive deixou em Download/
+  archive: ^3.6.1
+  crypto: ^3.0.3
+  file_picker: ^8.1.2
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
