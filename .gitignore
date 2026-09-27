@@ -53,3 +53,6 @@ PROXIMO_TRABALHO.md
 
 # backups locais de patch (nao versionar)
 *.bak_*
+
+# pacotes gerados pro celular: arquivo grande, nao vai pro git
+pacotes/

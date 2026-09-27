@@ -1,6 +1,7 @@
 # Roxin Mobile — plano v1 (Android + iPhone)
 
-> **Escrito em:** 27/09/2026 · **Estado:** plano pronto, aguarda as respostas da F0
+> **Escrito em:** 27/09/2026 · **Estado:** **F0 fechada em 27/09/2026 — execução liberada.**
+> Revisado no mesmo dia: o transporte virou Google Drive e o pacote virou `.zip` (ver §3 e F3).
 > **Propósito deste arquivo:** é o mapa de retomada. Sessão que cair, limite que estourar,
 > outra máquina que assumir — lê isto, confere os checkboxes e continua de onde parou.
 > **Nenhuma linha de código antes deste plano estar commitado.**
@@ -9,6 +10,12 @@
 > 1. *"tenho iphone e android, os dois"* (27/09/2026)
 > 2. *"eu mando as musicas pro celular pra poder ouvir off"* (27/09/2026) → **offline, arquivos no aparelho**
 > 3. *"tem que funcionar com pc desligado"* (27/09/2026)
+>
+> **E a segunda rodada, também em 27/09/2026, que fechou a F0:**
+> 4. *"por enquanto faz sem a parte de baixar músicas"* (27/09/2026) → **Anzol fora da v1**
+> 5. *"Eu vou baixar as músicas pelo Drive"* (27/09/2026) → **o transporte é o Google Drive**
+> 6. *"Eu escolho quais músicas eu vou mandar"* (27/09/2026) → **a seleção é dele, no PC**
+> 7. *"faz o Android funcionar primeiro"* (27/09/2026) → **iPhone depois; a D1 dos US$ 99 não trava nada**
 >
 > ⚠️ **Tudo o que NÃO estiver entre aspas com data neste arquivo é dedução minha.** As
 > recomendações da F0, a divisão de fases e a escolha de Flutter são propostas minhas, abertas
@@ -66,21 +73,29 @@ gerado no PC.
 ## 3. Arquitetura (recomendação minha)
 
 ```
-PC (quando ligado)                           Celular (sempre)
-+------------------------+                   +------------------------+
-| Roxin de mesa          |                   | Roxin Mobile (Flutter) |
-|                        |    Wi-Fi local    |                        |
-|  empacotar.py  --------+------------------>|  pasta Roxin/          |
-|   . faixas escolhidas  |  (HTTP temporario |   . musicas/*.mp3      |
-|   . capas              |   na rede de casa)|   . capas/*.jpg        |
-|   . roxin.json         |                   |   . roxin.json         |
-|     (indice portatil)  |                   |                        |
-+------------------------+                   |  just_audio +          |
-                                             |  audio_service         |
-   PC desligado = so nao da pra SINCRONIZAR  |  (tela bloqueada, fone,|
-   Ouvir continua funcionando sempre.        |   CarPlay/Android Auto)|
-                                             +------------------------+
+PC (quando ligado)              Google Drive        Celular (sempre)
++---------------------+                            +------------------------+
+| Roxin de mesa       |                            | Roxin Mobile (Flutter) |
+|                     |    ele sobe      ele baixa |                        |
+|  empacotar.py       |  1 arquivo .zip   pelo app | importa o .zip de      |
+|   . ele escolhe as  +----------------> ... ----->| Download/ e desempacota|
+|     playlists       |                            | na pasta do app        |
+|   . musicas + capas |                            |                        |
+|   . roxin.json      |                            |  just_audio +          |
+|     (indice         |                            |  audio_service         |
+|      relativo)      |                            |  (tela bloqueada, fone)|
++---------------------+                            +------------------------+
+
+   PC desligado = so nao da pra GERAR pacote novo. Ouvir funciona sempre.
 ```
+
+**Por que UM `.zip`, e não uma pasta** (verificado em 27/09/2026): o app do Google Drive no
+Android **não baixa pasta** — só arquivo a arquivo. Baixar pasta inteira exige abrir o Drive
+no navegador em **modo desktop**, e o que chega é **um ZIP** em `Download/`. Mandar uma pasta
+com 238 arquivos por esse caminho seria tortura. Um `.zip` por playlist o app do Drive baixa
+direto, sem ginástica. **Custo declarado:** desempacotar precisa de espaço livre temporário
+(~o dobro do tamanho do pacote) e o app ganha uma tela de importação que não existiria se
+fosse Wi-Fi direto.
 
 **Flutter** (Dart), com `just_audio` para tocar + `audio_service` para o som sobreviver à tela
 apagada e pôr os controles na tela de bloqueio. É o par maduro e testado para player de música.
@@ -90,13 +105,13 @@ fábrica web é vanilla por decisão registrada, e isso **continua valendo lá**
 **preso ao repo do Roxin** e não encosta nos apps Cloudflare. A alternativa de não usar
 framework seria escrever **duas vezes** (Kotlin + Swift), que é pior por todo lado.
 
-**A sincronização por Wi-Fi da casa, não por cabo — proposta minha.** O Roxin do PC sobe um
-servidor HTTP temporário na rede local e o celular baixa o pacote. Motivo: no iPhone, copiar
-5 GB pelo app Arquivos com cabo no Windows é lento e irritante; e o Wi-Fi funciona **igual**
-nos dois aparelhos. *Isto não fere o "pc desligado" dele* (27/09/2026): o PC só precisa estar
-ligado para **sincronizar**, nunca para **ouvir**. Cabo continua existindo como plano B.
+**O transporte é o Google Drive** — *"Eu vou baixar as músicas pelo Drive"* (27/09/2026).
+Some a Ponte Wi-Fi que eu tinha proposto: não há servidor na rede local, não há pareamento,
+não há cabo. O PC gera o `.zip`, ele sobe no Drive pela mão dele, e o celular baixa. *Isto não
+fere o "pc desligado"* (27/09/2026): o PC só precisa estar ligado para **gerar pacote novo**,
+nunca para **ouvir**.
 
-## 4. F0 — o que é dele responder
+## 4. F0 — o que era dele responder (fechada)
 
 ### Cravado ✅ — fala dele, não re-perguntar
 - [x] *"eu mando as musicas pro celular pra poder ouvir off"* (27/09/2026) → offline, no aparelho
@@ -106,15 +121,19 @@ ligado para **sincronizar**, nunca para **ouvir**. Cabo continua existindo como 
 ### Proposto por mim, aguardando ✅ ou ❌ dele
 - [ ] O app mobile **veste a marca** do `BRANDING.md` (não inventa paleta) — dedução minha a
       partir de o Roxin já ter identidade fechada; ele ainda não se manifestou sobre isso
+- [ ] O pacote ser **`.zip` por playlist** — dedução minha a partir do que o Drive do Android
+      faz (§3); ele disse o transporte, não o formato
 
-### Aberto — cada uma com a minha recomendação
+### Respondido em 27/09/2026 — a F0 está fechada
 
-| # | Pergunta | Minha recomendação | Por quê |
+| # | Pergunta | Resposta dele | O que mudou no plano |
 |---|---|---|---|
-| D1 | **iPhone: pagar US$ 99/ano à Apple, ou reinstalar o app a cada 7 dias?** | **Começar pelo Android e resolver isto depois** | O Android custa **zero** (instala o APK direto, sem loja, sem taxa). Resolver os US$ 99 depois de o app existir e ele ter usado é escolher com informação, não com promessa. O sideload que chegou ao Brasil em 2026 **não livra da taxa** — continua exigindo o Developer Program |
-| D2 | **Quanto do acervo vai para o celular?** | **Playlists escolhidas, não os 18 GB** | "Ghibli melhores" tem 1h40 (~230 MB). Na minha proposta, ele marca no PC quais listas viajam. 18 GB inteiros é possível, mas come o aparelho e a sincronização leva horas |
-| D3 | **Como as músicas chegam no celular hoje?** (pergunta de fato, não de gosto) | — | Muda a F3: se já existe um caminho que funciona no iPhone dele, a Ponte pode se apoiar nele em vez de inventar |
-| D4 | **Baixar música pelo celular (o Anzol)?** | **Fora da v1** | `yt-dlp` não roda no iPhone. Faria o app nascer torto nos dois sistemas para servir um só |
+| D1 | iPhone: US$ 99/ano ou reinstalar a cada 7 dias? | *"faz o Android funcionar primeiro"* (27/09/2026) | **Adiada, não respondida.** A F7 fica em espera; nada mais depende dela |
+| D2 | Quanto do acervo vai? | *"Eu escolho quais músicas eu vou mandar"* (27/09/2026) | O `empacotar.py` **não decide nada** — recebe a seleção dele e obedece |
+| D3 | Como as músicas chegam no celular? | *"Eu vou baixar as músicas pelo Drive"* (27/09/2026) | **A Ponte Wi-Fi foi cortada.** F3 vira "pacote `.zip` para o Drive" |
+| D4 | Baixar música pelo celular (Anzol)? | *"por enquanto faz sem a parte de baixar músicas"* (27/09/2026) | Fora da v1, confirmado. O *"por enquanto"* dele fica registrado: é adiamento, não sepultamento |
+
+**Ainda em aberto, mas sem travar nada:** a D1 (os US$ 99) só é necessária quando a F7 chegar.
 
 ## 5. Funcionalidades
 
@@ -126,7 +145,7 @@ ligado para **sincronizar**, nunca para **ouvir**. Cabo continua existindo como 
 5. Busca por nome de arquivo (igual ao PC)
 6. Capa na lista, no rodapé e no **palco** de capa cheia
 7. **Som com a tela bloqueada** + controles de bloqueio/fone/carro
-8. Sincronizar pelo Wi-Fi de casa, com relatório do que entrou e do que faltou
+8. Importar o pacote `.zip` baixado do Drive, com relatório do que entrou e do que faltou
 
 ### Fora da v1 — proposta minha de escopo, não fazer sem pedido novo
 - Baixar música dentro do app (Anzol) — D4
@@ -139,14 +158,18 @@ ligado para **sincronizar**, nunca para **ouvir**. Cabo continua existindo como 
 
 ## 6. O CORAÇÃO — o Pacote Roxin ⛔
 
-**O que é:** `empacotar.py`, no PC, pega as playlists escolhidas e produz uma pasta portátil:
+**O que é:** `empacotar.py`, no PC, pega as playlists **que ele escolher** e produz **um
+arquivo** `Roxin_<playlist>.zip`, pronto para subir no Drive:
 
 ```
-Roxin/
+Roxin_Ghibli-melhores.zip
   roxin.json          <- o indice: faixas, playlists, duracoes, qual capa e de quem
   musicas/            <- os arquivos, com nome normalizado
   capas/              <- so as capas das faixas que viajaram
 ```
+
+*"Eu escolho quais músicas eu vou mandar"* (27/09/2026) — o script **não decide** o que viaja:
+recebe a seleção e obedece.
 
 **Por que ISTO é o coração, e não o player:** tocar um MP3 é problema resolvido por biblioteca.
 O que mata o app é o índice errado — e o cofre já pagou por isso. Em 27/09/2026, 29 arquivos
@@ -165,7 +188,7 @@ absoluto. Nada de `D:\Music` dentro dele.
 | 3 | Faixa com acento, `&`, `#` e parênteses no nome | chega tocável e com o nome certo na tela |
 | 4 | Mesma faixa em 2 playlists | **1 arquivo só** no pacote, referenciado 2× — o pacote não duplica bytes |
 | 5 | Faixa sem capa | entra com o pássaro, **não** some da lista |
-| 6 | Empacotar 2× seguidas | o 2º reaproveita o que já está lá, e diz o que mudou |
+| 6 | Empacotar 2× seguidas | o 2º **diz o que mudou** em relação ao 1º (entraram / saíram / iguais) |
 | 7 | SHA256 de cada faixa do pacote × original | **idêntico** — o pacote não re-codifica nada |
 
 ⛔ **Gate: sem os 7 verdes e sem ele aprovar, não existe tela nenhuma.**
@@ -174,22 +197,35 @@ absoluto. Nada de `D:\Music` dentro dele.
 
 ### P1 — Pesquisa: a entrada dos arquivos no iPhone e o som em segundo plano
 > 🧠 Modelo: **Sonnet** (pesquisa é volume de leitura)
-- [ ] Como um app iOS recebe arquivos do usuário e os lê depois: `UIFileSharingEnabled`,
-      `LSSupportsOpeningDocumentsInPlace`, o que aparece no app Arquivos, e o que sobrevive a
-      atualização do app
-- [ ] Android: `READ_MEDIA_AUDIO` × Storage Access Framework — qual dá acesso estável a uma
-      pasta grande sem pedir permissão a cada abertura
-- [ ] `audio_service`: o que é preciso para o sistema **não matar** o app com a tela apagada, nos dois
-- [ ] Limites reais: 5–10 GB dentro da sandbox do app, e o que o iOS faz quando o espaço aperta
+> ⚠️ **Android primeiro** — *"faz o Android funcionar primeiro"* (27/09/2026). O iOS vira o
+> último item, e não bloqueia nada.
+- [ ] **Android: ler o `.zip` que o Drive largou em `Download/`** — `READ_MEDIA_AUDIO` ×
+      Storage Access Framework × seletor de arquivo: qual caminho dá acesso estável sem pedir
+      permissão a cada abertura, e o que muda do Android 11 para cá
+- [ ] **Android: `audio_service`** — o que é preciso para o sistema **não matar** o app com a
+      tela apagada, incluindo o que a otimização de bateria do fabricante faz
+- [ ] Espaço: o que acontece ao desempacotar um `.zip` grande com o aparelho quase cheio
+- [ ] *(por último, sem travar)* iOS: `UIFileSharingEnabled`, `LSSupportsOpeningDocumentsInPlace`
+      e como um `.zip` do Drive entra na pasta do app
 - [ ] **Entrega:** checklist acionável para quem implementa a F2 e a F3
 
-### F1 — BACK · O Pacote (o coração) ⛔
+### F1 — BACK · O Pacote (o coração) ⛔ — **CONSTRUÍDA em 27/09/2026, aguardando o gate**
 > 🧠 Modelo: **Opus em `/fable-mode`** — errar aqui estraga o acervo dele
-- [ ] `empacotar.py`: lê os `.m3u`, resolve capas e durações, normaliza nomes, escreve `roxin.json`
-- [ ] **Só lê** `D:\Music` — nunca renomeia, nunca move, nunca apaga (lei do filtro, 27/09/2026)
-- [ ] Testes dos 7 casos do §6, com controle positivo (teste que falha quando deveria)
-- [ ] Gate: ele confere e aprova
-- [ ] Commit
+- [x] `empacotar.py`: lê os `.m3u`, resolve capas e durações, normaliza nomes, escreve `roxin.json`
+- [x] **Só lê** `D:\Music` — nunca renomeia, nunca move, nunca apaga (lei do filtro, 27/09/2026)
+- [x] Testes dos 7 casos do §6, com controle positivo — `testes/teste_empacotar.py`, **34 verdes**
+- [x] Rodado no acervo real: **27 faixas, 27 capas, 99,5 MB**, e `conferir_playlists.py` segue
+      com **940 entradas / 0 quebradas** (o acervo dele não foi tocado)
+- [x] Prova por caminho independente: `Get-FileHash` do Windows confirmou que a faixa extraída
+      do pacote é byte a byte igual à do disco (3 amostras), e o índice tem **0** caminho do PC
+- [ ] ⛔ **Gate: ele confere e aprova** ← *é aqui que está agora*
+- [x] Commit
+
+**O que este pacote NÃO faz, dito antes de ele perguntar:** gerar de novo **refaz o `.zip`
+inteiro**, não aproveita o anterior — recopia todas as faixas. Para 99 MB são segundos; para
+a `Eletronica` (5,2 GB) é alguns minutos de disco. Preferi refazer porque pacote remendado é
+onde nasce índice mentindo sobre o próprio conteúdo. O que ele ganha em troca: o relatório do
+que entrou e do que saiu desde a última vez.
 
 ### F2 — BACK · O motor do app (sem tela bonita)
 > 🧠 Modelo: **Opus em `/fable-mode`**
@@ -199,12 +235,15 @@ absoluto. Nada de `D:\Music` dentro dele.
 - [ ] Interface crua de propósito — **tela feia é regra desta fase**
 - [ ] Commit
 
-### F3 — BACK · A Ponte (sincronização por Wi-Fi)
-> 🧠 Modelo: **Opus**
-- [ ] No PC: servidor HTTP temporário, na rede local, com código de pareamento
-- [ ] No celular: baixar, verificar (tamanho + hash) e relatar o que entrou e o que faltou
-- [ ] Retomar sincronização interrompida sem recomeçar do zero
-- [ ] Plano B por cabo documentado nos dois sistemas
+### F3 — BACK · A importação do pacote (pelo Drive)
+> 🧠 Modelo: **Opus** · *reescrita em 27/09/2026: era Ponte Wi-Fi, virou Drive por causa de*
+> *"Eu vou baixar as músicas pelo Drive"* (27/09/2026)
+- [ ] No PC: `empacotar.py` fecha a saída num **`.zip` por playlist**, pronto para ele subir no Drive
+- [ ] No celular: escolher o `.zip` em `Download/`, desempacotar na pasta do app, **verificar**
+      (contagem + tamanho + hash) e **relatar** o que entrou e o que faltou
+- [ ] Importar um segundo pacote **soma** à biblioteca, não apaga a anterior
+- [ ] Importação interrompida no meio não deixa biblioteca pela metade (ou entra tudo, ou nada)
+- [ ] Avisar quando faltar espaço **antes** de começar a desempacotar
 - [ ] Commit
 
 ### F4 — FRONT · Direção (Opus) — **uma tela só**
@@ -296,7 +335,7 @@ a mesma cor e um timbre de letra um pouco diferente. Amostra para ele na F4.
 |---|---|
 | **O som para sozinho com a tela apagada** (o sistema mata o app) | P1 investiga antes · F2 implementa `audio_service` · critério de pronto exige 1 h real |
 | **A playlist chega quebrada no celular** — repetindo o dano de 27/09 | F1 é o coração com gate ⛔ e 7 casos-teste · `conferir_playlists.py` |
-| **Sincronizar é tão chato que ele desiste** (cabo, horas, travando) | F3 é fase própria, por Wi-Fi, com retomada e relatório · D2 limita o volume |
+| **Mandar música é tão chato que ele desiste** | F3 é fase própria: **um** arquivo para subir no Drive, **um** para baixar · ele escolhe o tamanho da mordida (D2) |
 | **O iPhone fica de fora** porque a conta cara / os 7 dias travam | D1 respondida cedo · Android primeiro, custo zero, entrega valor sem depender da Apple |
 | **Fica com cara de outro app** — some o Roxin, sobra um player genérico | F4 é direção antes de réplica, com aprovação dele · veste a marca · pássaro em SVG do vetor original |
 | **O Flutter vira um peso** que ninguém mantém | Preso ao repo do Roxin, sem encostar na fábrica web · o app de mesa continua sendo a fonte da verdade |
@@ -308,7 +347,7 @@ a mesma cor e um timbre de letra um pouco diferente. Amostra para ele na F4.
 | `audio_service` não segura o som no iOS do jeito que promete | O Android entrega sozinho (F6 não depende do iPhone). No iPhone, plano B honesto é um cliente pronto tocando os arquivos — perde a cara do Roxin, mantém a música |
 | Apple recusa a conta / o sideload brasileiro muda de regra | Android continua de pé. iPhone espera, sem travar nada |
 | 18 GB não couberem no aparelho | D2 já resolve: viaja a playlist escolhida, não o acervo |
-| Wi-Fi da casa não cooperar com a Ponte | Cabo, documentado nos dois sistemas na F3 |
+| O `.zip` chegar corrompido pelo Drive | A importação confere hash antes de aceitar e recusa inteiro, em vez de montar meia biblioteca |
 | Playlist editada no PC e o celular ficar velho calado | O app mostra **a data do pacote** na tela de sincronização — dado velho que se anuncia não engana |
 
 ## Anexo — o que NÃO sobrevive à travessia

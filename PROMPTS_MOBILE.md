@@ -4,28 +4,33 @@
 > **Um prompt por fase, autocontido.** Copiar o bloco inteiro e colar numa sessão nova.
 > Cada prompt diz: o modelo, o que ler antes, o escopo, o que é **PROIBIDO** e o critério de pronto.
 >
-> ⚠️ **Nada aqui roda antes das respostas da F0** (D1–D4 do plano). A P1 e a F1 são as únicas
-> que podem começar sem elas.
+> ✅ **F0 fechada em 27/09/2026.** Respostas dele: Anzol fora da v1 · transporte pelo **Google
+> Drive** · a **seleção das músicas é dele** · **Android primeiro**. A F7 (iPhone) segue parada
+> até ele resolver os US$ 99/ano, e não bloqueia nenhuma outra fase.
 
 ---
 
-## P1 — Pesquisa: arquivos no iPhone e som em segundo plano
+## P1 — Pesquisa: o Android (arquivo do Drive + som em segundo plano)
 **Modelo: Sonnet**
 
 ```
 Leia antes: D:\Player Musica\PLANO_MOBILE_V1.md (secoes 2, 3 e a fase P1).
 
+ANDROID PRIMEIRO -- ele disse em 27/09/2026: "faz o Android funcionar primeiro".
+O iOS e o ultimo item e nao bloqueia nada.
+
 Voce vai pesquisar, nao implementar. Quatro perguntas, com fonte para cada resposta:
 
-1. Como um app iOS recebe arquivos de musica do usuario e os le depois:
-   UIFileSharingEnabled, LSSupportsOpeningDocumentsInPlace, o que aparece no app Arquivos,
-   e o que sobrevive a uma atualizacao do app.
-2. Android: READ_MEDIA_AUDIO x Storage Access Framework. Qual da acesso estavel a uma pasta
-   grande sem pedir permissao a cada abertura.
-3. audio_service (Flutter): o que e preciso para o sistema NAO matar o app com a tela
-   apagada, no Android e no iOS. Inclua os erros conhecidos e como se detecta cada um.
-4. Limites reais de 5-10 GB dentro da sandbox do app, e o que o iOS faz quando o espaco
-   do aparelho aperta.
+1. Android: como um app le um .zip que o Google Drive largou em Download/. READ_MEDIA_AUDIO
+   x Storage Access Framework x seletor de arquivo -- qual da acesso estavel sem pedir
+   permissao a cada abertura, e o que mudou do Android 11 para ca.
+2. Android: audio_service. O que e preciso para o sistema NAO matar o app com a tela apagada,
+   incluindo o que a otimizacao de bateria dos fabricantes faz. Erros conhecidos e como se
+   detecta cada um.
+3. Espaco: o que acontece ao desempacotar um .zip grande com o aparelho quase cheio, e como
+   se checa espaco livre ANTES de comecar.
+4. (por ultimo, sem travar) iOS: UIFileSharingEnabled, LSSupportsOpeningDocumentsInPlace, e
+   como um .zip baixado do Drive entra na pasta do app.
 
 Entrega: um documento em D:\Player Musica\PESQUISA_MOBILE.md terminando em CHECKLIST
 ACIONAVEL para quem implementa a F2 e a F3 — item por item, verificavel.
@@ -47,8 +52,14 @@ Leia antes:
   D:\Player Musica\Musica.pyw (funcoes carregar(), limpar(), sem_acento(), cache_duracoes())
   D:\Player Musica\conferir_playlists.py
 
-Construa empacotar.py: le as playlists .m3u escolhidas em D:\Music\Playlists e produz uma
-pasta portatil Roxin/ com musicas/, capas/ e roxin.json (indice com CAMINHO RELATIVO).
+Construa empacotar.py: le as playlists .m3u que ELE escolher em D:\Music\Playlists e produz
+UM ARQUIVO Roxin_<playlist>.zip contendo musicas/, capas/ e roxin.json (indice com CAMINHO
+RELATIVO, nunca absoluto).
+
+Por que .zip e nao pasta (verificado em 27/09/2026): o app do Google Drive no Android nao
+baixa PASTA, so arquivo a arquivo. Um arquivo unico ele baixa direto para Download/.
+Ele escolhe as playlists -- "Eu escolho quais musicas eu vou mandar" (27/09/2026); o script
+nao decide nada por ele.
 
 LEI DESTA FASE, paga com erro real em 27/09/2026 (29 arquivos dele renomeados, 17 entradas
 de playlist quebradas): este script SO LE D:\Music. Nunca renomeia, nunca move, nunca apaga,
@@ -98,25 +109,28 @@ emulador, com a fila e a volta funcionando.
 
 ---
 
-## F3 — A Ponte (sincronização por Wi-Fi)
+## F3 — A importação do pacote (pelo Drive)
 **Modelo: Opus**
 
 ```
 Leia antes: PLANO_MOBILE_V1.md (secao 3 e a fase F3) + PESQUISA_MOBILE.md.
-Confirme a resposta da D3 (como as musicas chegam no celular dele hoje) antes de desenhar
-a Ponte — se ja existe um caminho que funciona no iPhone dele, apoie-se nele.
 
-No PC: servidor HTTP temporario na rede local, com codigo de pareamento, servindo a pasta
-Roxin/ gerada pela F1. Sobe quando ele manda, cai quando termina.
-No celular: baixar, verificar (tamanho + hash) e RELATAR o que entrou e o que faltou.
-Sincronizacao interrompida retoma de onde parou, sem recomecar.
+O transporte e o Google Drive -- "Eu vou baixar as musicas pelo Drive" (27/09/2026). NAO
+existe servidor na rede local, nao existe pareamento, nao existe cabo. Ele sobe o .zip no
+Drive com a mao dele; o app so precisa saber IMPORTAR o que o Drive deixou em Download/.
 
-Documente o plano B por cabo nos dois sistemas.
+No celular:
+  - escolher o .zip, desempacotar na pasta do app
+  - VERIFICAR (contagem + tamanho + hash do roxin.json) e RELATAR o que entrou e o que faltou
+  - importar um 2o pacote SOMA a biblioteca, nao apaga a anterior
+  - importacao interrompida nao deixa biblioteca pela metade: ou entra tudo, ou nada
+  - checar espaco livre ANTES de desempacotar, e avisar em vez de falhar no meio
 
-PROIBIDO: expor o servidor fora da rede local, abrir porta no roteador, subir qualquer
-musica para a internet. PROIBIDO mexer no motor da F2 alem do necessario para ligar a Ponte.
-Pronto quando: o pacote de "Ghibli melhores" (27 faixas) viaja inteiro para um aparelho
-real, com relatorio de 0 faltando, e uma sincronizacao interrompida no meio retoma certo.
+PROIBIDO: subir qualquer musica para a internet, abrir porta no roteador, pedir a conta do
+Google dele ou integrar com a API do Drive (ele baixa na mao -- e mais simples e nao pede
+credencial nenhuma). PROIBIDO mexer no motor da F2 alem do necessario para ligar a importacao.
+Pronto quando: o pacote de "Ghibli melhores" (27 faixas) atravessa PC -> Drive -> celular
+e a biblioteca no aparelho tem as 27, com relatorio de 0 faltando.
 ```
 
 ---
@@ -160,7 +174,7 @@ que se anunciar).
 
 PROIBIDO inventar componente, cor, fonte, espaco ou animacao fora dos tokens da F4.
 Duvida de estilo: pergunta, nao inventa.
-PROIBIDO mexer no motor (F2) ou na Ponte (F3).
+PROIBIDO mexer no motor (F2) ou na importacao do pacote (F3).
 Pronto quando: todas as telas da v1 existem e nenhuma usa nada fora dos tokens.
 ```
 
@@ -174,8 +188,8 @@ Leia antes: PLANO_MOBILE_V1.md (secao 9b, os criterios de pronto).
 
 Gere o APK assinado e entregue a ele instalavel (custo zero, sem loja, sem taxa).
 Depois, a jornada real, no aparelho dele:
-  sincronizar pelo Wi-Fi -> modo aviao -> tocar 1 HORA com a tela apagada -> conferir os
-  controles de bloqueio e do fone.
+  gerar o pacote no PC -> ele sobe no Drive -> baixa no celular -> importar -> modo aviao ->
+  tocar 1 HORA com a tela apagada -> conferir os controles de bloqueio e do fone.
 
 Reporte o que aconteceu de verdade. Se o som parou aos 20 minutos, o relato e "parou aos
 20 minutos", nao "funcionou". Teste verde e deploy feito provam o codigo; quem fecha o
