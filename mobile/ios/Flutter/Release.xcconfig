@@ -1,1 +1,10 @@
+// ⚠️ A linha dos Pods vem PRIMEIRO, e sem ela o app sai sem plugin nenhum.
+//
+// Pago com erro em 27/09/2026: o `flutter create --platforms=ios` rodado no
+// WINDOWS gera este arquivo só com o Generated.xcconfig. No Mac do CI, o
+// CocoaPods então avisava "did not set the base configuration of your project"
+// e seguia: resultado, "1 total pod installed" (só o Flutter) e um .ipa sem
+// just_audio, sem audio_service, sem file_picker -- um Roxin que abre e nao toca.
+// Dois .ipa saíram byte a byte iguais antes de eu achar isto.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
 #include "Generated.xcconfig"

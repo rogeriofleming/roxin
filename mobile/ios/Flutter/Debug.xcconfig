@@ -1,1 +1,4 @@
+// Ver o comentário do Release.xcconfig: sem esta primeira linha o app sai sem
+// nenhum plugin nativo, e o build passa verde do mesmo jeito.
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"

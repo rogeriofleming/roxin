@@ -55,19 +55,27 @@ jobs:
         working-directory: mobile
         run: flutter test
 
-      # ⚠️ Passo pago com erro em 27/09/2026: sem o pod install os plugins
-      # nativos NAO entram no app, e o build passa verde do mesmo jeito --
-      # entregando um Roxin que abre e nao toca. O Podfile agora e versionado.
-      - name: CocoaPods (integrar os plugins nativos)
-        working-directory: mobile/ios
-        run: |
-          pod install --repo-update
-          echo "--- pods instalados ---"
-          grep -E "^\s+- " Podfile.lock | head -20
-
-      - name: Build iOS sem assinatura
+      # O pod install NAO se roda a mao aqui. Tentei em 27/09/2026 e foi pior:
+      # rodando antes do `flutter build`, os symlinks dos plugins ainda nao
+      # existem em ios/.symlinks, e o CocoaPods instala so o pod "Flutter" --
+      # "1 dependency from the Podfile and 1 total pod installed". Quem cria os
+      # symlinks e depois chama o pod install na ordem certa e o proprio
+      # `flutter build ios`.
+      - name: Build iOS sem assinatura (ele mesmo roda o pod install)
         working-directory: mobile
         run: flutter build ios --release --no-codesign
+
+      - name: O que o CocoaPods instalou de verdade
+        working-directory: mobile/ios
+        run: |
+          echo "--- pods no Podfile.lock ---"
+          sed -n '/^PODS:/,/^DEPENDENCIES:/p' Podfile.lock | head -25
+          N=$(grep -cE "^  - " Podfile.lock || true)
+          echo "total de pods: $N"
+          if [ "$N" -lt 5 ]; then
+            echo "::error::so $N pod(s) instalado(s) -- os plugins nativos nao entraram."
+            exit 1
+          fi
 
       - name: Empacotar em .ipa
         working-directory: mobile/build/ios/iphoneos
@@ -95,7 +103,7 @@ jobs:
           echo "--- plugins linkados estaticamente no binario? ---"
           # plugin com static_framework nao vira pasta .framework: entra DENTRO
           # do binario Runner. Entao procuro pelos simbolos, nao so por pasta.
-          for S in JustAudio AudioPlayer AudioService FilePicker PathProvider PermissionHandler; do
+          for S in JustAudioPlugin AudioServicePlugin FilePickerPlugin PathProviderPlugin PermissionHandlerPlugin; do
             if nm -U Payload/Runner.app/Runner 2>/dev/null | grep -qi "$S"; then
               echo "  simbolo encontrado: $S"
             fi
