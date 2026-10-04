@@ -14,11 +14,18 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QListWidget,
     QListWidgetItem, QLineEdit, QTableWidget, QTableWidgetItem, QLabel, QPushButton,
     QSlider, QHeaderView, QAbstractItemView, QFrame, QSizePolicy,
-    QGraphicsOpacityEffect, QComboBox, QCheckBox)
+    QGraphicsOpacityEffect, QComboBox, QCheckBox, QFileDialog)
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput, QMediaDevices
 
 MUSICA    = r"D:\Music"
 PLAYLISTS = r"D:\Music\Playlists"
+
+
+def aplicar_pasta_musica(caminho):
+    """Troca de onde o Roxin le o acervo (e onde ele espera achar Playlists dentro)."""
+    global MUSICA, PLAYLISTS
+    MUSICA = os.path.normpath(caminho)
+    PLAYLISTS = os.path.join(MUSICA, "Playlists")
 EXT       = (".mp3", ".m4a")
 CAPA_LISTA  = 40          # capinha ao lado de cada musica
 CAPA_RODAPE = 58          # capa da que esta tocando, no canto
@@ -405,6 +412,9 @@ QListWidget::item { margin:1px 0; }
     color:%(pena)s; padding:0; }
 #secao { color:%(fraca)s; font-size:10px; font-weight:700;
     letter-spacing:2.5px; padding:14px 20px 6px; }
+#botaoPasta { color:%(fraca)s; font-size:11px; text-align:left; border:none;
+    background:transparent; padding:10px 20px 14px; }
+#botaoPasta:hover { color:%(pena)s; }
 QListWidget { background:transparent; border:none; outline:none; padding:0 10px; }
 QListWidget::item { padding:9px 10px; border-radius:6px; color:#c8c2d6; }
 QListWidget::item:hover { background:#1f1a2e; }
@@ -894,6 +904,10 @@ class Mini(QWidget):
 class Player(QMainWindow):
     def __init__(self):
         super().__init__()
+        self._ajustes = ler_ajustes()
+        pasta_salva = self._ajustes.get("pasta_musica")
+        if pasta_salva and os.path.isdir(pasta_salva):
+            aplicar_pasta_musica(pasta_salva)
         self.faixas, self.listas = carregar()
         self.listas = list(self.listas)
         self.visiveis, self.ordem, self.pos, self.tocando = [], [], -1, -1
@@ -925,7 +939,6 @@ class Player(QMainWindow):
 
         self._pinta_fila()
 
-        self._ajustes = ler_ajustes()
         # teto do cache de miniaturas: sem isto fica no default do Qt, sem controle.
         # 24 MB cobre a tela cheia de capinhas com folga e nao cresce sozinho.
         QPixmapCache.setCacheLimit(24 * 1024)
@@ -978,6 +991,13 @@ class Player(QMainWindow):
         self.lista_pls.setContextMenuPolicy(Qt.CustomContextMenu)
         self.lista_pls.customContextMenuRequested.connect(self._menu_playlist)
         cl.addWidget(self.lista_pls, 1)
+
+        self.b_pasta = QPushButton("Trocar pasta de músicas…")
+        self.b_pasta.setObjectName("botaoPasta")
+        self.b_pasta.setCursor(Qt.PointingHandCursor)
+        self.b_pasta.setToolTip("Escolher de onde o Roxin lê o acervo")
+        self.b_pasta.clicked.connect(self._trocar_pasta_musica)
+        cl.addWidget(self.b_pasta)
         linha.addWidget(lado)
 
         # ---- centro
@@ -1999,6 +2019,29 @@ class Player(QMainWindow):
         self._grava_lista(nome, itens)
         self._filtra()
         self.tab.selectRow(para)
+
+    def _trocar_pasta_musica(self):
+        """Deixa escolher de onde o acervo vem, em vez do D:\\Music cravado no código —
+        é o que torna o Roxin usável em outra máquina, não só na minha."""
+        inicial = MUSICA if os.path.isdir(MUSICA) else ""
+        pasta = QFileDialog.getExistingDirectory(
+            self, "Escolher a pasta com as músicas", inicial)
+        if not pasta or os.path.normpath(pasta) == MUSICA:
+            return
+        self.mp.stop()
+        self.fila = []
+        aplicar_pasta_musica(pasta)
+        self._ajustes["pasta_musica"] = MUSICA
+        gravar_ajustes(self._ajustes)
+        self.faixas, self.listas = carregar()
+        self.listas = list(self.listas)
+        self.lista_idx = None
+        self.pos, self.tocando = -1, -1
+        self.ordem_base, self.lista_tocando = [], None
+        self._rotulos_playlists()
+        self._pinta_fila()
+        self.lista_pls.setCurrentRow(0)        # dispara _abre(0) via currentRowChanged
+        self._abre(0)                          # garante a tela mesmo se já estava na linha 0
 
     def _menu_playlist(self, ponto):
         from PySide6.QtWidgets import QMenu, QInputDialog, QMessageBox

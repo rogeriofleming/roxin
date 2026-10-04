@@ -5,6 +5,13 @@
 **Player de música de mesa para acervo local, em Windows.** Lê o nome do arquivo,
 mostra só nome e duração, e sai da frente.
 
+[![Baixar o Roxin para Windows](https://img.shields.io/badge/Baixar_o_Roxin-Windows-a77cf0?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/rogeriofleming/roxin/releases/latest/download/Roxin-windows.zip)
+
+Baixa um `.zip` com o app e um `instalar.bat` — precisa de
+[Python 3.11+](https://python.org) instalado. O `LEIAME.txt` dentro explica os
+três passos. Detalhes e por que não é um instalador de verdade: seção
+["Rodar"](#rodar) abaixo.
+
 ![O Roxin aberto numa playlist](docs/tela.png)
 
 ## Por que ele existe
@@ -71,30 +78,33 @@ O raciocínio completo está em [`BRANDING.md`](BRANDING.md).
 
 ## Rodar
 
-Python 3.11+ e `pip install PySide6`.
+Python 3.11+ e `pip install PySide6 mutagen yt-dlp`.
 
 ```
 pythonw Musica.pyw
 ```
 
-**Ele roda pelo fonte, não por executável.** O Smart App Control do Windows bloqueia
-binário novo sem reputação, então o caminho é um atalho para `pythonw`. A vantagem
-prática: toda mudança no código vale na próxima abertura, sem reconstruir nada.
+Ou baixe o pacote pronto no botão lá em cima — é o mesmo código, só empacotado com
+um `instalar.bat` que resolve as bibliotecas.
+
+**Ele roda pelo fonte, não por executável de verdade.** O `Roxin.exe` é uma cópia do
+`pythonw.exe` do Windows com ícone e nome trocados: o Smart App Control bloqueia
+binário novo sem reputação, e essa cópia herda a assinatura da Python Software
+Foundation. A vantagem prática: toda mudança no código vale na próxima abertura, sem
+reconstruir nada.
 
 ### Honestidade sobre o escopo
 
-Isto é software feito para uma máquina — a minha. Os caminhos do acervo estão
-**cravados no código**, em `Musica.pyw`:
+Isto é software feito para o meu acervo — um player de mesa, não um produto com
+suporte. Na primeira abertura a lista vem vazia: clique em **"Trocar pasta de
+músicas…"**, no canto de baixo à esquerda, e aponte para onde estão os seus
+`.mp3`/`.m4a`. Se houver uma pasta `Playlists` com `.m3u` dentro, ele lê sozinho. A
+escolha fica salva (em `%LOCALAPPDATA%\Roxin\ajustes.json`) — não precisa repetir.
 
-```python
-MUSICA    = r"D:\Music"
-PLAYLISTS = r"D:\Music\Playlists"
-```
-
-Para rodar em outro lugar, troque essas duas linhas. Não há tela de configuração,
-instalador, nem suporte. Está público porque o que foi resolvido aqui pode ser útil a
-quem enfrentar os mesmos problemas — acervo sem metadados, capa que não existe,
-sobreposição transparente no Windows — não porque seja um produto.
+Fora isso, não há tela de configuração nem suporte. Está público porque o que foi
+resolvido aqui pode ser útil a quem enfrentar os mesmos problemas — acervo sem
+metadados, capa que não existe, sobreposição transparente no Windows — não porque
+seja um produto.
 
 ## Testes
 
